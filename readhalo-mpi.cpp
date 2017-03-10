@@ -9,6 +9,7 @@
 #include <chrono>
 #include <mpi.h>
 #include <math.h>
+// Need run parameters
 //#define  ARRAYSIZE	20
 //#define  CELL		25.0
 #define  MASTER		0
