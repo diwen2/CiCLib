@@ -9,3 +9,5 @@ generateImage
 generateRandomCube
 FOFGetFiles
 /Default/
+getAreaFiles
+readhalo-mpi
