@@ -13,11 +13,10 @@
 ##PBS -A jq8
 
 export HOME_DIR=/u/sciteam/dwen/FOFReaderLib
+export WORK_DIR=/u/sciteam/dwen/scratch/jobs/list_503_cell_25_size_20_p_4
 export IN_DIR=/u/sciteam/dwen/scratch/listdata
-cd $PBS_O_WORKDIR
-cp $HOME_DIR/readhalo-mpi.cpp $PBS_O_WORKDIR
-cp $HOME_DIR/readhalo-mpi $PBS_O_WORKDIR
-cp -r $IN_DIR/list_503 $PBS_O_WORKDIR
+cp $HOME_DIR/readhalo-mpi.cpp $WORk_DIR
+cp $HOME_DIR/readhalo-mpi $WORK_DIR
+cp -r $IN_DIR/list_503 $WORK_DIR
+cd $WORK_DIR
 aprun -n 4 ./readhalo-mpi > out.$PBS_JOBID
-
-
