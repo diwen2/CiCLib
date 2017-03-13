@@ -1,0 +1,23 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4:xe
+### set the wallclock time
+#PBS -l walltime=00:05:00
+### set the job name
+#PBS -N testjob
+### set the job stdout and stderr
+#PBS -e $PBS_JOBID.err
+#PBS -o $PBS_JOBID.out
+### set email notification
+#PBS -m bea
+#PBS -M diwen2@illinois.edu
+##PBS -A jq8
+
+export HOME_DIR=/u/sciteam/dwen/FOFReaderLib
+export IN_DIR=/u/sciteam/dwen/scratch/listdata
+cd $PBS_O_WORKDIR
+cp $HOME_DIR/readhalo-mpi.cpp $PBS_O_WORKDIR
+cp $HOME_DIR/readhalo-mpi $PBS_O_WORKDIR
+cp -r $IN_DIR/list_503 $PBS_O_WORKDIR
+aprun -n 4 ./readhalo-mpi > out.$PBS_JOBID
+
+
