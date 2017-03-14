@@ -10,12 +10,12 @@
 ### set email notification
 #PBS -m bea
 #PBS -M diwen2@illinois.edu
-##PBS -A jq8
+#PBS -A jq8
 
 export HOME_DIR=/u/sciteam/dwen/FOFReaderLib
 export WORK_DIR=/u/sciteam/dwen/scratch/jobs/list_503_cell_25_size_20_p_4
 export IN_DIR=/u/sciteam/dwen/scratch/listdata
-cp $HOME_DIR/readhalo-mpi.cpp $WORk_DIR
+cp $HOME_DIR/readhalo-mpi.cpp $WORK_DIR
 cp $HOME_DIR/readhalo-mpi $WORK_DIR
 cp -r $IN_DIR/list_503 $WORK_DIR
 cd $WORK_DIR
