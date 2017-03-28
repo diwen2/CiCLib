@@ -59,9 +59,9 @@ vector<vector<float> > genfromFOF(int num_files) {
 
 // initialize a vector of vectors that each hold a halo's parameter from text file
 // should avoid using CSV files because writing to file changes data precision
-vector<vector<double> > genfromtxt() {
+vector<vector<float> > genfromtxt() {
 
-	vector<vector<double> > halo_positions;
+	vector<vector<float> > halo_positions;
 
 	// read the text file output of FOFReader
 	ifstream file("halos_output.csv");
@@ -69,12 +69,12 @@ vector<vector<double> > genfromtxt() {
 	string line;
 	// read the input file a line at a time until file hits end-of-file
 	while (getline(file, line)) {
-		vector<double> row;
+		vector<float> row;
 		istringstream iss(line);  // bind iss to the line read
 		for (int n = 0; n < 5; ++n) {
 			string val;
 			iss >> val;
-			double num = atof(val.c_str());
+			float num = atof(val.c_str());
 			row.push_back(num);
 			// cout << num << " ";
 		}
@@ -83,6 +83,32 @@ vector<vector<double> > genfromtxt() {
 	}
 	// cout << halo_positions[0][2];
 	return halo_positions;
+}
+
+vector<vector<float> > genfrombin(){
+	ifstream in("halo_positions.bin",ios_base::binary);
+	in.seekg(0,ios::end);
+	int length = in.tellg();
+	in.seekg(0,ios::beg);
+	cout << "Input halo positions data size is " << length << " bytes."<< endl;
+	vector<vector <float> > read_positions;
+	if(in.good())
+	{
+		vector<float> row(5);
+		for (unsigned int i=0; i<length/(5*sizeof(float)); ++i){
+			in.read((char *)&row[0],5*sizeof(float));
+			read_positions.push_back(row);
+		}
+	}
+	cout << "1st halo is " << read_positions[0][0] <<" "<<read_positions[0][1]<<" "
+			<<read_positions[0][2]<<" "<<read_positions[0][3]<<" "<<read_positions[0][4]<<endl;
+	cout << "2nd halo is " << read_positions[1][0] <<" "<<read_positions[1][1]<<" "
+			<<read_positions[1][2]<<" "<<read_positions[1][3]<<" "<<read_positions[1][4]<<endl;
+	cout << "...." << endl;
+	cout << length/(5*sizeof(float))-1 <<"th halo is " << read_positions[length/(5*sizeof(float))-1][0] <<" "
+			<<read_positions[length/(5*sizeof(float))-1][1]<<" "<<read_positions[length/(5*sizeof(float))-1][2]<<" "
+			<<read_positions[length/(5*sizeof(float))-1][3]<<" "<<read_positions[length/(5*sizeof(float))-1][4]<<endl;
+	return read_positions;
 }
 
 // function to initialize coordiante grid and count
@@ -112,8 +138,9 @@ vector<vector<double> > initcoordinate(double resolution, double xmin, double xm
 // i.e. number of grid on an axis must be divisible by number of processes
 double xarray[ARRAYSIZE];
 int counts[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
-//vector<vector<double> > halo_positions = genfromtxt();
-vector<vector<float> > halo_positions = genfromFOF(512);
+//vector<vector<float> > halo_positions = genfromtxt();
+//vector<vector<float> > halo_positions = genfromFOF(512);
+vector<vector<float> > halo_positions = genfrombin();
 
 int main(int argc, char *argv[]) {
 	int numtasks, taskid, dest, offset, tag1, tag2, source, chunksize;

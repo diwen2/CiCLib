@@ -20,7 +20,7 @@ SOURCES= FOFReaderLib/FOFFiles/FOFCube.cpp \
     FOFReaderLib/DEUSSimulation/DEUSSimulationSingleton.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 
-all: $(SOURCES) FOFReader getAreaFiles getBiggestHalo exportMasst generateImage generateRandomCube readhalo-mpi
+all: $(SOURCES) FOFReader getAreaFiles getBiggestHalo exportMasst generateImage generateRandomCube readhalo-mpi savebin
 	
 FOFReader: FOFReader.o $(OBJECTS) 
 	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@
@@ -43,8 +43,11 @@ generateRandomCube: generateRandomCube.o $(OBJECTS)
 readhalo-mpi: readhalo-mpi.o $(OBJECTS) 
 	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@
 
+savebin: savebin.o $(OBJECTS) 
+	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@	
+
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@
 	
 clean:
-	rm -rf *o FOFReaderLib/*.o FOFReaderLib/FOFFiles/*.o FOFReaderLib/DEUSSimulation/*.o FOFReader getBiggestHalo exportMasst generateImage generateRandomCube getAreaFiles readhalo-mpi
+	rm -rf *o FOFReaderLib/*.o FOFReaderLib/FOFFiles/*.o FOFReaderLib/DEUSSimulation/*.o FOFReader getBiggestHalo exportMasst generateImage generateRandomCube getAreaFiles readhalo-mpi savebin
