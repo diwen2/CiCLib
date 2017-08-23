@@ -6,9 +6,10 @@
 #include <stdlib.h>
 #include <algorithm>
 #include "FOFReaderLib/FOFReaderLib.h"
-#include <chrono>
+//#include <chrono>
 #include <mpi.h>
-#include <math.h>
+#include <cmath>
+//#include <math.h>
 // Need run parameters
 //#define  ARRAYSIZE	20
 //#define  CELL		25.0
@@ -20,6 +21,7 @@ const double unit_l = 0.277801161516035e+28;  //in cm
 const double h = 0.720000000000000;
 const double Mpc = 3.085677581e+24;  // cm per Mpc
 const double radius = CELL/(unit_l/Mpc*h);
+//const float radius = 0.05; // >0.0499999 produces wrong counts
 
 using namespace std;
 
@@ -87,6 +89,7 @@ vector<vector<float> > genfromtxt() {
 
 vector<vector<float> > genfrombin(){
 	ifstream in("halo_positions.bin",ios_base::binary);
+	//ifstream in("uniform_0.05.bin",ios_base::binary);
 	in.seekg(0,ios::end);
 	int length = in.tellg();
 	in.seekg(0,ios::beg);
@@ -105,13 +108,14 @@ vector<vector<float> > genfrombin(){
 	cout << "2nd halo is " << read_positions[1][0] <<" "<<read_positions[1][1]<<" "
 			<<read_positions[1][2]<<" "<<read_positions[1][3]<<" "<<read_positions[1][4]<<endl;
 	cout << "...." << endl;
-	cout << length/(5*sizeof(float))-1 <<"th halo is " << read_positions[length/(5*sizeof(float))-1][0] <<" "
+	cout << length/(5*sizeof(float)) <<"th halo is " << read_positions[length/(5*sizeof(float))-1][0] <<" "
 			<<read_positions[length/(5*sizeof(float))-1][1]<<" "<<read_positions[length/(5*sizeof(float))-1][2]<<" "
 			<<read_positions[length/(5*sizeof(float))-1][3]<<" "<<read_positions[length/(5*sizeof(float))-1][4]<<endl;
 	return read_positions;
 }
 
 // function to initialize coordiante grid and count
+/*
 vector<vector<double> > initcoordinate(double resolution, double xmin, double xmax) {
 	vector<vector<double> > coordinates;
 	for (double z = resolution / 2; z < 1; z = z + resolution) {
@@ -133,10 +137,34 @@ vector<vector<double> > initcoordinate(double resolution, double xmin, double xm
 	}
 	return coordinates;
 }
+*/
+// function to initialize coordiante grid and count
+vector<vector<float> > initcoordinate(float resolution, float xmin, float xmax) {
+	vector<vector<float> > coordinates;
+	for (float z = resolution / 2; z < 1; z = z + resolution) {
+		for (float y = resolution / 2; y < 1; y = y + resolution) {
+			for (float x = xmin; x < xmax + resolution / 2;
+					x = x + resolution) {
+				vector<float> coordinate;
+				coordinate.push_back(x); // append number count 0 to coordinate
+				coordinate.push_back(y);
+				coordinate.push_back(z);
+				coordinate.push_back(0.0);
+				coordinates.push_back(coordinate); //append all coordinates
+				// cout << coordinate[0] << " ";
+				// cout << coordinate[1] << " ";
+				// cout << coordinate[2] << " ";
+				// cout << coordinate[3] << endl;
+			}
+		}
+	}
+	return coordinates;
+}
 
 // ARRAYSIZE/numtasks has to an integer
 // i.e. number of grid on an axis must be divisible by number of processes
-double xarray[ARRAYSIZE];
+//double xarray[ARRAYSIZE];
+float xarray[ARRAYSIZE];
 int counts[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
 //vector<vector<float> > halo_positions = genfromtxt();
 //vector<vector<float> > halo_positions = genfromFOF(512);
@@ -144,8 +172,9 @@ vector<vector<float> > halo_positions = genfrombin();
 
 int main(int argc, char *argv[]) {
 	int numtasks, taskid, dest, offset, tag1, tag2, source, chunksize;
-	double resolution = 1 / (double)ARRAYSIZE;
-	double starttime, endtime;
+	//double resolution = 1 / (double)ARRAYSIZE;
+	float resolution = 1/(float)ARRAYSIZE;
+	float starttime, endtime;
 
 	MPI_Status status;
 
@@ -173,7 +202,8 @@ int main(int argc, char *argv[]) {
 		offset = chunksize;
 		for (dest = 1; dest < numtasks; dest++) {
 			MPI_Send(&offset, 1, MPI_INT, dest, tag1, MPI_COMM_WORLD);
-			MPI_Send(&xarray[offset], chunksize, MPI_DOUBLE, dest, tag2,MPI_COMM_WORLD);
+			//MPI_Send(&xarray[offset], chunksize, MPI_DOUBLE, dest, tag2,MPI_COMM_WORLD);
+			MPI_Send(&xarray[offset], chunksize, MPI_FLOAT, dest, tag2,MPI_COMM_WORLD);
 			printf("Sent %d elements to task %d offset= %d\n", chunksize, dest,
 					offset);
 			offset = offset + chunksize;
@@ -181,20 +211,35 @@ int main(int argc, char *argv[]) {
 
 		/* Master does its part of the work */
 		offset = 0;
-		vector<vector<double> > coord_count = initcoordinate(resolution,
+		//vector<vector<double> > coord_count = initcoordinate(resolution,
+		//		xarray[0], xarray[chunksize - 1]);
+		vector<vector<float> > coord_count = initcoordinate(resolution,
 				xarray[0], xarray[chunksize - 1]);
-		//printf("Task 0 %d coordinates start from %e, %e, %e, %e\n", coord_count.size(),
-		//coord_count[0][0], coord_count[0][1], coord_count[0][2], coord_count[0][3]);
+		printf("Task %d coordinates start from %e, %e, %e, %e\n", taskid,
+		coord_count[0][0], coord_count[0][1], coord_count[0][2], coord_count[0][3]);
 
 		printf("Task 0 has %d coordinates.\n", (int)coord_count.size());
 
 		for (unsigned long int i = 0; i < coord_count.size(); ++i){
 			for (unsigned int j = 0; j < halo_positions.size(); ++j){
-				if ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
+				if (abs((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
 				   +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
 				   +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2])
-				   < radius*radius){
+				   - radius*radius) <= 0.00000001)
+				{
+					printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
+							halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
+							coord_count[i][0], coord_count[i][1], coord_count[i][2]);
+				}
+				else
+				{
+					if ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
+						+(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
+						+(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2])
+						< radius*radius)
+					{
 					coord_count[i][3] = coord_count[i][3] + 1;
+					}
 				}
 			}
 		}
@@ -231,7 +276,7 @@ int main(int argc, char *argv[]) {
 		printf("\nMaximum count is %d.\n", max_count);
 
 		ofstream countfile;
-		string filename = "freq_cell_"+to_string(CELL)+"_size_"+to_string(ARRAYSIZE)+"_p_"+to_string(ARRAYSIZE)+".txt";
+		string filename = "freq_cell_"+to_string(CELL)+"_size_"+to_string(ARRAYSIZE)+"_p_"+to_string(numtasks)+".txt";
 		countfile.open(filename);
 
 
@@ -267,19 +312,37 @@ int main(int argc, char *argv[]) {
 		/* Receive my portion of array from the master task */
 		source = MASTER;
 		MPI_Recv(&offset, 1, MPI_INT, source, tag1, MPI_COMM_WORLD, &status);
-		MPI_Recv(&xarray[offset], chunksize, MPI_DOUBLE, source, tag2, MPI_COMM_WORLD, &status);
+		//MPI_Recv(&xarray[offset], chunksize, MPI_DOUBLE, source, tag2, MPI_COMM_WORLD, &status);
+		MPI_Recv(&xarray[offset], chunksize, MPI_FLOAT, source, tag2, MPI_COMM_WORLD, &status);
 
-		vector<vector<double> > coord_count = initcoordinate(resolution,
+		//vector<vector<double> > coord_count = initcoordinate(resolution,
+		//		xarray[offset], xarray[offset + chunksize - 1]);
+		vector<vector<float> > coord_count = initcoordinate(resolution,
 				xarray[offset], xarray[offset + chunksize - 1]);
+		printf("Task %d coordinates start from %e, %e, %e, %e\n", taskid,
+				coord_count[0][0], coord_count[0][1], coord_count[0][2], coord_count[0][3]);
 		printf("Task %d has %lu coordinates.\n", taskid, coord_count.size());
 
 		for (unsigned long int i = 0; i < coord_count.size(); ++i){
 			for (unsigned int j = 0; j < halo_positions.size(); ++j){
-				if ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
+				if (abs((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
 				   +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
 				   +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2])
-				   < radius*radius){
+				   - radius*radius) <= 0.00000001)
+				{
+					printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
+							halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
+							coord_count[i][0], coord_count[i][1], coord_count[i][2]);
+				}
+				else
+				{
+					if ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
+						+(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
+						+(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2])
+						< radius*radius)
+					{
 					coord_count[i][3] = coord_count[i][3] + 1;
+					}
 				}
 			}
 		}
