@@ -10,6 +10,7 @@
 #include <mpi.h>
 //#include <cmath>
 #include <math.h>
+#include "machar.h"
 // Need run parameters
 //#define  ARRAYSIZE	20
 //#define  CELL		25.0
@@ -179,6 +180,8 @@ int main(int argc, char *argv[]) {
 	//float resolution = 1/(float)ARRAYSIZE;
 	printf("Linear resolution is %.7e.\n",resolution);
 	float starttime, endtime;
+	struct Machar machine_parameter;
+	machine_parameter.report();
 
 	MPI_Status status;
 
