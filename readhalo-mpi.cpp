@@ -9,14 +9,14 @@
 //#include <chrono>
 #include <mpi.h>
 //#include <cmath>
-#include <math.h>
+//#include <math.h>
 #include "machar.h"
 // Need run parameters
 //#define  ARRAYSIZE	20
 //#define  CELL		25.0
 #define  MASTER		0
 
-const int ARRAYSIZE = 20; //number of grids on one side of a cubic box
+const int ARRAYSIZE = 40; //number of grids on one side of a cubic box
 const int CELL = 25;  //in Mpc/h
 const double unit_l = 0.277801161516035e+28;  //in cm
 const double h = 0.720000000000000;
@@ -181,7 +181,9 @@ int main(int argc, char *argv[]) {
 	printf("Linear resolution is %.7e.\n",resolution);
 	float starttime, endtime;
 	struct Machar machine_parameter;
-	machine_parameter.report();
+	//machine_parameter.report();
+	double eps = machine_parameter.eps;
+	double epsneg = machine_parameter.epsneg;
 
 	MPI_Status status;
 
@@ -229,23 +231,30 @@ int main(int argc, char *argv[]) {
 
 		for (unsigned long int i = 0; i < coord_count.size(); ++i){
 			for (unsigned int j = 0; j < halo_positions.size(); ++j){
-				if (abs((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
-				   +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
-				   +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2])
-				   - radius*radius)/(radius*radius) <= epsilon)
+				double ratio = ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
+						   	   +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
+							   +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2]))
+							   /(radius*radius);
+				if (ratio <= double(1.0))
 				{
-					printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
-							halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
-							coord_count[i][0], coord_count[i][1], coord_count[i][2]);
+					if (double(1.0)-ratio > epsneg)
+					{
+						coord_count[i][3] = coord_count[i][3] + 1;
+					}
+					else
+					{
+						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
+								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
+								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
+					}
 				}
 				else
 				{
-					if ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
-						+(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
-						+(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2])
-						< radius*radius)
+					if (ratio-double(1.0) < eps)
 					{
-					coord_count[i][3] = coord_count[i][3] + 1;
+						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
+								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
+								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
 					}
 				}
 			}
@@ -332,23 +341,30 @@ int main(int argc, char *argv[]) {
 
 		for (unsigned long int i = 0; i < coord_count.size(); ++i){
 			for (unsigned int j = 0; j < halo_positions.size(); ++j){
-				if (abs((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
-				   +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
-				   +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2])
-				   - radius*radius)/(radius*radius) <= epsilon)
+				double ratio = ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
+						   	   +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
+							   +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2]))
+							   /(radius*radius);
+				if (ratio <= double(1.0))
 				{
-					printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
-							halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
-							coord_count[i][0], coord_count[i][1], coord_count[i][2]);
+					if (double(1.0)-ratio > epsneg)
+					{
+						coord_count[i][3] = coord_count[i][3] + 1;
+					}
+					else
+					{
+						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
+								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
+								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
+					}
 				}
 				else
 				{
-					if ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
-						+(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
-						+(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2])
-						< radius*radius)
+					if (ratio-double(1.0) < eps)
 					{
-					coord_count[i][3] = coord_count[i][3] + 1;
+						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
+								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
+								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
 					}
 				}
 			}
