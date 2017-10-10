@@ -1,5 +1,6 @@
 #CC=g++
-CC=mpic++
+#CC=mpic++
+CC=CC
 CFLAGS=-c -Wall -O3 -g -pg -fopenmp -std=c++11
 LDFLAGS=-fopenmp
 SOURCES= FOFReaderLib/FOFFiles/FOFCube.cpp \
