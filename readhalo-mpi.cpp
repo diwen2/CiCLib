@@ -8,20 +8,22 @@
 #include "FOFReaderLib/FOFReaderLib.h"
 //#include <chrono>
 #include <mpi.h>
-#include <cmath>
+//#include <cmath>
 //#include <math.h>
+#include "machar.h"
 // Need run parameters
 //#define  ARRAYSIZE	20
 //#define  CELL		25.0
 #define  MASTER		0
 
-const int ARRAYSIZE = 20;
+const int ARRAYSIZE = 40; //number of grids on one side of a cubic box
 const int CELL = 25;  //in Mpc/h
 const double unit_l = 0.277801161516035e+28;  //in cm
 const double h = 0.720000000000000;
 const double Mpc = 3.085677581e+24;  // cm per Mpc
 const double radius = CELL/(unit_l/Mpc*h);
 //const float radius = 0.05; // >0.0499999 produces wrong counts
+const double epsilon = 1.0e-7;
 
 using namespace std;
 
@@ -115,7 +117,7 @@ vector<vector<float> > genfrombin(){
 }
 
 // function to initialize coordiante grid and count
-/*
+
 vector<vector<double> > initcoordinate(double resolution, double xmin, double xmax) {
 	vector<vector<double> > coordinates;
 	for (double z = resolution / 2; z < 1; z = z + resolution) {
@@ -137,8 +139,9 @@ vector<vector<double> > initcoordinate(double resolution, double xmin, double xm
 	}
 	return coordinates;
 }
-*/
+
 // function to initialize coordiante grid and count
+/*
 vector<vector<float> > initcoordinate(float resolution, float xmin, float xmax) {
 	vector<vector<float> > coordinates;
 	for (float z = resolution / 2; z < 1; z = z + resolution) {
@@ -160,11 +163,12 @@ vector<vector<float> > initcoordinate(float resolution, float xmin, float xmax) 
 	}
 	return coordinates;
 }
+*/
 
 // ARRAYSIZE/numtasks has to an integer
 // i.e. number of grid on an axis must be divisible by number of processes
-//double xarray[ARRAYSIZE];
-float xarray[ARRAYSIZE];
+double xarray[ARRAYSIZE];
+//float xarray[ARRAYSIZE];
 int counts[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
 //vector<vector<float> > halo_positions = genfromtxt();
 //vector<vector<float> > halo_positions = genfromFOF(512);
@@ -172,9 +176,14 @@ vector<vector<float> > halo_positions = genfrombin();
 
 int main(int argc, char *argv[]) {
 	int numtasks, taskid, dest, offset, tag1, tag2, source, chunksize;
-	//double resolution = 1 / (double)ARRAYSIZE;
-	float resolution = 1/(float)ARRAYSIZE;
+	double resolution = 1 / (double)ARRAYSIZE;
+	//float resolution = 1/(float)ARRAYSIZE;
+	printf("Linear resolution is %.7e.\n",resolution);
 	float starttime, endtime;
+	struct Machar machine_parameter;
+	//machine_parameter.report();
+	double eps = machine_parameter.eps;
+	double epsneg = machine_parameter.epsneg;
 
 	MPI_Status status;
 
@@ -183,7 +192,7 @@ int main(int argc, char *argv[]) {
 	MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
 	MPI_Comm_rank(MPI_COMM_WORLD, &taskid);
 	printf("MPI task %d has started...\n", taskid);
-	chunksize = (ARRAYSIZE / numtasks);
+	chunksize = ARRAYSIZE / numtasks;
 	tag2 = 1;
 	tag1 = 2;
 	starttime = MPI_Wtime();
@@ -202,8 +211,8 @@ int main(int argc, char *argv[]) {
 		offset = chunksize;
 		for (dest = 1; dest < numtasks; dest++) {
 			MPI_Send(&offset, 1, MPI_INT, dest, tag1, MPI_COMM_WORLD);
-			//MPI_Send(&xarray[offset], chunksize, MPI_DOUBLE, dest, tag2,MPI_COMM_WORLD);
-			MPI_Send(&xarray[offset], chunksize, MPI_FLOAT, dest, tag2,MPI_COMM_WORLD);
+			MPI_Send(&xarray[offset], chunksize, MPI_DOUBLE, dest, tag2,MPI_COMM_WORLD);
+			//MPI_Send(&xarray[offset], chunksize, MPI_FLOAT, dest, tag2,MPI_COMM_WORLD);
 			printf("Sent %d elements to task %d offset= %d\n", chunksize, dest,
 					offset);
 			offset = offset + chunksize;
@@ -211,10 +220,10 @@ int main(int argc, char *argv[]) {
 
 		/* Master does its part of the work */
 		offset = 0;
-		//vector<vector<double> > coord_count = initcoordinate(resolution,
-		//		xarray[0], xarray[chunksize - 1]);
-		vector<vector<float> > coord_count = initcoordinate(resolution,
+		vector<vector<double> > coord_count = initcoordinate(resolution,
 				xarray[0], xarray[chunksize - 1]);
+		//vector<vector<float> > coord_count = initcoordinate(resolution,
+		//		xarray[0], xarray[chunksize - 1]);
 		printf("Task %d coordinates start from %e, %e, %e, %e\n", taskid,
 		coord_count[0][0], coord_count[0][1], coord_count[0][2], coord_count[0][3]);
 
@@ -222,23 +231,30 @@ int main(int argc, char *argv[]) {
 
 		for (unsigned long int i = 0; i < coord_count.size(); ++i){
 			for (unsigned int j = 0; j < halo_positions.size(); ++j){
-				if (abs((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
-				   +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
-				   +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2])
-				   - radius*radius) <= 0.00000001)
+				double ratio = ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
+						   	   +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
+							   +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2]))
+							   /(radius*radius);
+				if (ratio <= double(1.0))
 				{
-					printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
-							halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
-							coord_count[i][0], coord_count[i][1], coord_count[i][2]);
+					if (double(1.0)-ratio > epsneg)
+					{
+						coord_count[i][3] = coord_count[i][3] + 1;
+					}
+					else
+					{
+						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
+								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
+								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
+					}
 				}
 				else
 				{
-					if ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
-						+(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
-						+(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2])
-						< radius*radius)
+					if (ratio-double(1.0) < eps)
 					{
-					coord_count[i][3] = coord_count[i][3] + 1;
+						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
+								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
+								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
 					}
 				}
 			}
@@ -312,36 +328,43 @@ int main(int argc, char *argv[]) {
 		/* Receive my portion of array from the master task */
 		source = MASTER;
 		MPI_Recv(&offset, 1, MPI_INT, source, tag1, MPI_COMM_WORLD, &status);
-		//MPI_Recv(&xarray[offset], chunksize, MPI_DOUBLE, source, tag2, MPI_COMM_WORLD, &status);
-		MPI_Recv(&xarray[offset], chunksize, MPI_FLOAT, source, tag2, MPI_COMM_WORLD, &status);
+		MPI_Recv(&xarray[offset], chunksize, MPI_DOUBLE, source, tag2, MPI_COMM_WORLD, &status);
+		//MPI_Recv(&xarray[offset], chunksize, MPI_FLOAT, source, tag2, MPI_COMM_WORLD, &status);
 
-		//vector<vector<double> > coord_count = initcoordinate(resolution,
-		//		xarray[offset], xarray[offset + chunksize - 1]);
-		vector<vector<float> > coord_count = initcoordinate(resolution,
+		vector<vector<double> > coord_count = initcoordinate(resolution,
 				xarray[offset], xarray[offset + chunksize - 1]);
+		//vector<vector<float> > coord_count = initcoordinate(resolution,
+		//		xarray[offset], xarray[offset + chunksize - 1]);
 		printf("Task %d coordinates start from %e, %e, %e, %e\n", taskid,
 				coord_count[0][0], coord_count[0][1], coord_count[0][2], coord_count[0][3]);
 		printf("Task %d has %lu coordinates.\n", taskid, coord_count.size());
 
 		for (unsigned long int i = 0; i < coord_count.size(); ++i){
 			for (unsigned int j = 0; j < halo_positions.size(); ++j){
-				if (abs((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
-				   +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
-				   +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2])
-				   - radius*radius) <= 0.00000001)
+				double ratio = ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
+						   	   +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
+							   +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2]))
+							   /(radius*radius);
+				if (ratio <= double(1.0))
 				{
-					printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
-							halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
-							coord_count[i][0], coord_count[i][1], coord_count[i][2]);
+					if (double(1.0)-ratio > epsneg)
+					{
+						coord_count[i][3] = coord_count[i][3] + 1;
+					}
+					else
+					{
+						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
+								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
+								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
+					}
 				}
 				else
 				{
-					if ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
-						+(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
-						+(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2])
-						< radius*radius)
+					if (ratio-double(1.0) < eps)
 					{
-					coord_count[i][3] = coord_count[i][3] + 1;
+						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
+								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
+								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
 					}
 				}
 			}

@@ -1,7 +1,7 @@
 #!/bin/bash
-#PBS -l nodes=1:ppn=4:xe
+#PBS -l nodes=2:ppn=20:xe
 ### set the wallclock time
-#PBS -l walltime=00:05:00
+#PBS -l walltime=00:15:00
 ### set the job name
 #PBS -N testjob
 ### set the job stdout and stderr
@@ -13,10 +13,8 @@
 #PBS -A jq8
 
 export HOME_DIR=/u/sciteam/dwen/FOFReaderLib
-export WORK_DIR=/u/sciteam/dwen/scratch/jobs/list_503_cell_25_size_20_p_4
-export IN_DIR=/u/sciteam/dwen/scratch/listdata
-cp $HOME_DIR/readhalo-mpi.cpp $WORK_DIR
-cp $HOME_DIR/readhalo-mpi $WORK_DIR
-cp -r $IN_DIR/list_503 $WORK_DIR
-cd $WORK_DIR
-aprun -n 4 ./readhalo-mpi > out.$PBS_JOBID
+cp $HOME_DIR/readhalo-mpi.cpp $PBS_O_WORKDIR
+cp $HOME_DIR/readhalo-mpi $PBS_O_WORKDIR
+cd $PBS_O_WORKDIR
+
+aprun -n 40 ./readhalo-mpi < halo_positions.bin > out.$PBS_JOBID

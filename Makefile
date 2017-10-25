@@ -1,5 +1,6 @@
 #CC=g++
-CC=mpic++
+#CC=mpic++
+CC=CC
 CFLAGS=-c -Wall -O3 -g -pg -fopenmp -std=c++11
 LDFLAGS=-fopenmp
 SOURCES= FOFReaderLib/FOFFiles/FOFCube.cpp \
@@ -20,7 +21,7 @@ SOURCES= FOFReaderLib/FOFFiles/FOFCube.cpp \
     FOFReaderLib/DEUSSimulation/DEUSSimulationSingleton.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 
-all: $(SOURCES) FOFReader getAreaFiles getBiggestHalo exportMasst generateImage generateRandomCube readhalo-mpi savebin
+all: $(SOURCES) FOFReader getAreaFiles getBiggestHalo exportMasst generateImage generateRandomCube readhalo-mpi savebin uniformhalo
 	
 FOFReader: FOFReader.o $(OBJECTS) 
 	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@
@@ -46,8 +47,11 @@ readhalo-mpi: readhalo-mpi.o $(OBJECTS)
 savebin: savebin.o $(OBJECTS) 
 	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@	
 
+uniformhalo: uniformhalo.o $(OBJECTS) 
+	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@	
+
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@
 	
 clean:
-	rm -rf *o FOFReaderLib/*.o FOFReaderLib/FOFFiles/*.o FOFReaderLib/DEUSSimulation/*.o FOFReader getBiggestHalo exportMasst generateImage generateRandomCube getAreaFiles readhalo-mpi savebin
+	rm -rf *o FOFReaderLib/*.o FOFReaderLib/FOFFiles/*.o FOFReaderLib/DEUSSimulation/*.o FOFReader getBiggestHalo exportMasst generateImage generateRandomCube getAreaFiles readhalo-mpi savebin uniformhalo
