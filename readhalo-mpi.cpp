@@ -315,6 +315,12 @@ int main(int argc, char *argv[]) {
 		printf("\nTotal counts is %lu.\n", sum);
 		cout << "Counts saved in file " << filename << "." << endl;
 
+		unsigned int num_uncertain;
+		for (unsigned long int i = 0; i < ARRAYSIZE*ARRAYSIZE*ARRAYSIZE; ++i) {
+			num_uncertain += uncertainty[i];
+		}
+		printf("\nTotal number of uncertain cases is %d.\n", num_uncertain);
+
 		// treat all uncertain cases as inside the cells and add uncertainty to counts
 		for (unsigned long int i = 0; i < ARRAYSIZE*ARRAYSIZE*ARRAYSIZE; ++i) {
 			counts[i] = counts[i] + uncertainty[i];
