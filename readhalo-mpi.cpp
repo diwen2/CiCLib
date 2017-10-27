@@ -315,7 +315,7 @@ int main(int argc, char *argv[]) {
 		printf("\nTotal counts is %lu.\n", sum);
 		cout << "Counts saved in file " << filename << "." << endl;
 
-		unsigned int num_uncertain;
+		unsigned int num_uncertain = 0;
 		for (unsigned long int i = 0; i < ARRAYSIZE*ARRAYSIZE*ARRAYSIZE; ++i) {
 			num_uncertain += uncertainty[i];
 		}
