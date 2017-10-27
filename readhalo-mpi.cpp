@@ -129,6 +129,7 @@ vector<vector<double> > initcoordinate(double resolution, double xmin, double xm
 				coordinate.push_back(y);
 				coordinate.push_back(z);
 				coordinate.push_back(0.0);
+				coordinate.push_back(0.0);
 				coordinates.push_back(coordinate); //append all coordinates
 				// cout << coordinate[0] << " ";
 				// cout << coordinate[1] << " ";
@@ -169,7 +170,8 @@ vector<vector<float> > initcoordinate(float resolution, float xmin, float xmax) 
 // i.e. number of grid on an axis must be divisible by number of processes
 double xarray[ARRAYSIZE];
 //float xarray[ARRAYSIZE];
-int counts[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
+unsigned int counts[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
+unsigned int uncertainty[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
 //vector<vector<float> > halo_positions = genfromtxt();
 //vector<vector<float> > halo_positions = genfromFOF(512);
 vector<vector<float> > halo_positions = genfrombin();
@@ -243,6 +245,7 @@ int main(int argc, char *argv[]) {
 					}
 					else
 					{
+						coord_count[i][4] = coord_count[i][4] + 1;
 						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
 								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
 								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
@@ -252,6 +255,7 @@ int main(int argc, char *argv[]) {
 				{
 					if (ratio-double(1.0) < eps)
 					{
+						coord_count[i][4] = coord_count[i][4] + 1;
 						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
 								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
 								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
@@ -270,6 +274,7 @@ int main(int argc, char *argv[]) {
 		//printf("Task 0 counts are %d %d ....\n", counts[0], counts[1]);
 		for (unsigned long int row = 0; row < coord_count.size(); ++row) {
 			counts[row] = coord_count[row][3];
+			uncertainty[row] = coord_count[row][4];
 			//printf("%d ", counts[row]);
 		}
 		printf("\n");
@@ -279,7 +284,8 @@ int main(int argc, char *argv[]) {
 		for (int i = 1; i < numtasks; i++) {
 			source = i;
 			MPI_Recv(&offset, 1, MPI_INT, source, tag1, MPI_COMM_WORLD, &status);
-			MPI_Recv(&counts[offset*ARRAYSIZE*ARRAYSIZE], coord_count.size(), MPI_INT, source, tag2, MPI_COMM_WORLD, &status);
+			MPI_Recv(&counts[offset*ARRAYSIZE*ARRAYSIZE], coord_count.size(), MPI_UNSIGNED, source, tag2, MPI_COMM_WORLD, &status);
+			MPI_Recv(&uncertainty[offset*ARRAYSIZE*ARRAYSIZE], coord_count.size(), MPI_UNSIGNED, source, tag2, MPI_COMM_WORLD, &status);
 		}
 
 		printf("\nPrinting all counts:\n");
@@ -295,30 +301,52 @@ int main(int argc, char *argv[]) {
 		string filename = "freq_cell_"+to_string(CELL)+"_size_"+to_string(ARRAYSIZE)+"_p_"+to_string(numtasks)+".txt";
 		countfile.open(filename);
 
-
 		unsigned long int sum = 0;
-		for (unsigned long int i = 0; i < max_count +1; ++i){
-			sum = sum + count(counts, counts+ARRAYSIZE*ARRAYSIZE*ARRAYSIZE, i);
-		}
-		printf("\nTotal counts is %lu.\n", sum);
-
 		printf("\nPrinting counts for every N:\n");
-		for (unsigned int i = 0; i < max_count +1; ++i) {
+		for (unsigned int i = 0; i < max_count +1; ++i){
+			// loop to count the occurrences in vector
+			sum = sum + count(counts, counts+ARRAYSIZE*ARRAYSIZE*ARRAYSIZE, i);
 			cout << count(counts, counts+ARRAYSIZE*ARRAYSIZE*ARRAYSIZE, i) << " ";
+			countfile << count(counts, counts+ARRAYSIZE*ARRAYSIZE*ARRAYSIZE, i) << " ";
+		}
+
+		countfile.close();
+
+		printf("\nTotal counts is %lu.\n", sum);
+		cout << "Counts saved in file " << filename << "." << endl;
+
+		// treat all uncertain cases as inside the cells and add uncertainty to counts
+		for (unsigned long int i = 0; i < ARRAYSIZE*ARRAYSIZE*ARRAYSIZE; ++i) {
+			counts[i] = counts[i] + uncertainty[i];
+			printf("%d ", counts[i]);
 		}
 		printf("\n");
 
+		unsigned int max_uncertain_count = *max_element(counts,
+				counts + ARRAYSIZE * ARRAYSIZE * ARRAYSIZE);
+		printf("\nMaximum uncertain count is %d.\n", max_uncertain_count);
 
-		// for loop to count the occurrences in vector
-		for (unsigned int i = 0; i < max_count +1; ++i){
-			countfile << count(counts, counts+ARRAYSIZE*ARRAYSIZE*ARRAYSIZE, i) << " ";
+		ofstream uncertaincountfile;
+		string fileuncertain = "uncertain_cell_" + to_string(CELL) + "_size_"
+				+ to_string(ARRAYSIZE) + "_p_" + to_string(numtasks) + ".txt";
+		uncertaincountfile.open(fileuncertain);
+
+		unsigned long int uncertain_sum = 0;
+		printf("\nPrinting counts for every N:\n");
+		for (unsigned int i = 0; i < max_count + 1; ++i) {
+			// loop to count the occurrences in vector
+			uncertain_sum = uncertain_sum + count(counts, counts + ARRAYSIZE * ARRAYSIZE * ARRAYSIZE, i);
+			cout << count(counts, counts + ARRAYSIZE * ARRAYSIZE * ARRAYSIZE, i) << " ";
+			uncertaincountfile << count(counts, counts + ARRAYSIZE * ARRAYSIZE * ARRAYSIZE,	i) << " ";
 		}
-		countfile.close();
-		cout << endl;
-		cout << "File " << filename << " saved!" << endl;
+
+		uncertaincountfile.close();
+
+		printf("\nTotal counts with uncertain cases is %lu.\n", uncertain_sum);
+		cout << "Counts with uncertain cases saved in file " << fileuncertain << "." << endl;
 
 		endtime = MPI_Wtime();
-		printf("Time is %e seconds", endtime-starttime);
+		printf("\nTime is %e seconds.\n", endtime-starttime);
 	} /* end of master section */
 
 	/***** Non-master tasks only *****/
@@ -353,6 +381,7 @@ int main(int argc, char *argv[]) {
 					}
 					else
 					{
+						coord_count[i][4] = coord_count[i][4] + 1;
 						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
 								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
 								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
@@ -362,6 +391,7 @@ int main(int argc, char *argv[]) {
 				{
 					if (ratio-double(1.0) < eps)
 					{
+						coord_count[i][4] = coord_count[i][4] + 1;
 						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
 								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
 								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
@@ -382,6 +412,7 @@ int main(int argc, char *argv[]) {
 		//printf("Task %d counts are %d %d....\n", taskid, counts[counts_offset], counts[counts_offset+1]);
 		for (unsigned long int row = 0; row < coord_count.size(); ++row) {
 			counts[counts_offset+row] = coord_count[row][3];
+			uncertainty[counts_offset+row] = coord_count[row][4];
 			//printf("%d ", counts[counts_offset+row]);
 		}
 		printf("\n");
@@ -390,7 +421,8 @@ int main(int argc, char *argv[]) {
 		/* Send my results back to the master task */
 		dest = MASTER;
 		MPI_Send(&offset, 1, MPI_INT, dest, tag1, MPI_COMM_WORLD);
-		MPI_Send(&counts[counts_offset], coord_count.size(), MPI_INT, MASTER, tag2, MPI_COMM_WORLD);
+		MPI_Send(&counts[counts_offset], coord_count.size(), MPI_UNSIGNED, MASTER, tag2, MPI_COMM_WORLD);
+		MPI_Send(&uncertainty[counts_offset], coord_count.size(), MPI_UNSIGNED, MASTER, tag2, MPI_COMM_WORLD);
 
 	} /* end of non-master */
 
