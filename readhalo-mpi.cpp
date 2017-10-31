@@ -411,7 +411,7 @@ int main(int argc, char *argv[]) {
 			printf("\nCounting error occured!\n");
 		}
 		plusminusfile.close();
-		cout << "\nError bars saved in file " << plusminusfile << "." << endl;
+		cout << "\nError bars saved in file " << plusminusfilename << "." << endl;
 		endtime = MPI_Wtime();
 		printf("\nTime is %e seconds.\n", endtime-starttime);
 	} /* end of master section */
