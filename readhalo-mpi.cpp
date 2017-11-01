@@ -370,11 +370,11 @@ int main(int argc, char *argv[]) {
 		cout << "Counts with uncertain cases saved in file " << fileuncertain << "." << endl;
 
 		// store plus/minus error in 2*N long array
-		ofstream plusminusfile;
-		string plusminusfilename = "plusminus_cell_" + to_string(CELL) + "_size_"
+		ofstream minusplusfile;
+		string minusplusfilename = "minusplus_cell_" + to_string(CELL) + "_size_"
 				+ to_string(ARRAYSIZE) + "_p_" + to_string(numtasks) + ".txt";
-		plusminusfile.open(plusminusfilename);
-		int plusminus[2*max_uncertain_count+2];
+		minusplusfile.open(minusplusfilename);
+		int minusplus[2*max_uncertain_count+2];
 		int totaluncertain = 0;
 		printf("\nPrinting error bars of every N ....\n");
 		if (max_count < max_uncertain_count){
@@ -383,35 +383,40 @@ int main(int argc, char *argv[]) {
 			Nfreq.insert(Nfreq.end(), zeros.begin(), zeros.end());
 			if (Nfreq.size() == Nfreq_uncertain.size()){
 				printf("\nAdded zeros after maximum count of N.\n");
-				plusminus[0] = 0;
-				plusminus[1] = Nfreq[0]-Nfreq_uncertain[0];
-				plusminusfile << plusminus[0] << " " << plusminus[1] << " ";
+				minusplus[0] = Nfreq[0]-Nfreq_uncertain[0];
+				minusplus[1] = 0;
+				minusplusfile << minusplus[0] << " " << minusplus[1] << " ";
 				for (unsigned int i = 1; i < max_uncertain_count +1; ++i){
-					plusminus[2*i] = plusminus[2*i-1];
-					plusminus[2*i+1] = Nfreq[i] + plusminus[2*i] - Nfreq_uncertain[i];
-					plusminusfile << plusminus[2*i] << " " << plusminus[2*i+1] << " ";
-					totaluncertain += plusminus[2*i];
+					//i'th lower error = i'th count + (i-1)th lower error - i'th uncertain count
+					minusplus[2*i] = Nfreq[i] + minusplus[2*i-2] - Nfreq_uncertain[i];
+					//i'th upper error = (i-1)th lower error
+					minusplus[2*i+1] = minusplus[2*i-2];
+					minusplusfile << minusplus[2*i] << " " << minusplus[2*i+1] << " ";
+					totaluncertain += minusplus[2*i+1];
 				}
 				printf("\nTotal number of uncertain cases is %d.\n", totaluncertain);
 			}
 		}
 		else if (max_count == max_uncertain_count){
-			plusminus[0] = 0;
-			plusminus[1] = Nfreq[0]-Nfreq_uncertain[0];
-			plusminusfile << plusminus[0] << " " << plusminus[1] << " ";
+			//for every N, write lower error, then upper error
+			minusplus[0] = Nfreq[0]-Nfreq_uncertain[0];
+			minusplus[1] = 0;
+			minusplusfile << minusplus[0] << " " << minusplus[1] << " ";
 			for (unsigned int i = 1; i < max_uncertain_count +1; ++i){
-				plusminus[2*i] = plusminus[2*i-1];
-				plusminus[2*i+1] = Nfreq[i] + plusminus[2*i] - Nfreq_uncertain[i];
-				plusminusfile << plusminus[2*i] << " " << plusminus[2*i+1] << " ";
-				totaluncertain += plusminus[2*i];
+				//i'th lower error = i'th count + (i-1)th lower error - i'th uncertain count
+				minusplus[2*i] = Nfreq[i] + minusplus[2*i-2] - Nfreq_uncertain[i];
+				//i'th upper error = (i-1)th lower error
+				minusplus[2*i+1] = minusplus[2*i-2];
+				minusplusfile << minusplus[2*i] << " " << minusplus[2*i+1] << " ";
+				totaluncertain += minusplus[2*i+1];
 			}
 			printf("\nTotal number of uncertain cases is %d.\n", totaluncertain);
 		}
 		else {
 			printf("\nCounting error occured!\n");
 		}
-		plusminusfile.close();
-		cout << "\nError bars saved in file " << plusminusfilename << "." << endl;
+		minusplusfile.close();
+		cout << "\nError bars saved in file " << minusplusfilename << "." << endl;
 		endtime = MPI_Wtime();
 		printf("\nTime is %e seconds.\n", endtime-starttime);
 	} /* end of master section */
