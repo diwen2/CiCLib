@@ -95,7 +95,7 @@ vector<vector<float> > genfrombin(){
 	in.seekg(0,ios::end);
 	int length = in.tellg();
 	in.seekg(0,ios::beg);
-	cout << "Input halo positions data size is " << length << " bytes."<< endl;
+	//cout << "Input halo positions data size is " << length << " bytes."<< endl;
 	vector<vector <float> > read_positions;
 	if(in.good())
 	{
@@ -105,6 +105,7 @@ vector<vector<float> > genfrombin(){
 			read_positions.push_back(row);
 		}
 	}
+	/*
 	cout << "1st halo is " << read_positions[0][0] <<" "<<read_positions[0][1]<<" "
 			<<read_positions[0][2]<<" "<<read_positions[0][3]<<" "<<read_positions[0][4]<<endl;
 	cout << "2nd halo is " << read_positions[1][0] <<" "<<read_positions[1][1]<<" "
@@ -113,6 +114,7 @@ vector<vector<float> > genfrombin(){
 	cout << length/(5*sizeof(float)) <<"th halo is " << read_positions[length/(5*sizeof(float))-1][0] <<" "
 			<<read_positions[length/(5*sizeof(float))-1][1]<<" "<<read_positions[length/(5*sizeof(float))-1][2]<<" "
 			<<read_positions[length/(5*sizeof(float))-1][3]<<" "<<read_positions[length/(5*sizeof(float))-1][4]<<endl;
+	*/
 	return read_positions;
 }
 
@@ -166,26 +168,21 @@ vector<vector<float> > initcoordinate(float resolution, float xmin, float xmax) 
 }
 */
 
-// ARRAYSIZE/numtasks has to an integer
-// i.e. number of grid on an axis must be divisible by number of processes
-double xarray[ARRAYSIZE];
-//float xarray[ARRAYSIZE];
-unsigned int counts[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
-unsigned int uncertainty[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
-//vector<vector<float> > halo_positions = genfromtxt();
-//vector<vector<float> > halo_positions = genfromFOF(512);
-vector<vector<float> > halo_positions = genfrombin();
-
 int main(int argc, char *argv[]) {
 	int numtasks, taskid, dest, offset, tag1, tag2, source, chunksize;
 	double resolution = 1 / (double)ARRAYSIZE;
 	//float resolution = 1/(float)ARRAYSIZE;
-	printf("Linear resolution is %.7e.\n",resolution);
 	float starttime, endtime;
 	struct Machar machine_parameter;
 	//machine_parameter.report();
 	double eps = machine_parameter.eps;
 	double epsneg = machine_parameter.epsneg;
+	// ARRAYSIZE/numtasks has to an integer
+	// i.e. number of grid on an axis must be divisible by number of processes
+	double xarray[ARRAYSIZE];
+	//float xarray[ARRAYSIZE];
+	unsigned int counts[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
+	unsigned int uncertainty[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
 
 	MPI_Status status;
 
@@ -193,14 +190,19 @@ int main(int argc, char *argv[]) {
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
 	MPI_Comm_rank(MPI_COMM_WORLD, &taskid);
-	printf("MPI task %d has started...\n", taskid);
 	chunksize = ARRAYSIZE / numtasks;
 	tag2 = 1;
 	tag1 = 2;
 	starttime = MPI_Wtime();
+	printf("MPI task %d has started...\n", taskid);
 
 	/***** Master task only ******/
 	if (taskid == MASTER) {
+
+		/* Print machine's smallest float larger or smaller than 1 */
+		printf("Machine eps equals to %.5e.\n", eps);
+		printf("Machine epsneg equals to %.5e.\n", epsneg);
+		printf("Linear resolution is %.7e.\n",resolution);
 
 		/* Initialize the array */
 		for (unsigned int i = 0; i < ARRAYSIZE; i++) {
@@ -220,13 +222,28 @@ int main(int argc, char *argv[]) {
 			offset = offset + chunksize;
 		}
 
+		/* Load halo catalog */
+		//printf("Task %d is loading halo catalog...\n", taskid);
+		//vector<vector<float> > halo_positions = genfromtxt();
+		//vector<vector<float> > halo_positions = genfromFOF(512);
+		vector<vector<float> > halo_positions = genfrombin();
+		printf("Task %d finished loading halo catalog.\n", taskid);
+		cout << "1st halo is " << halo_positions[0][0] <<" "<<halo_positions[0][1]<<" "
+					<<halo_positions[0][2]<<" "<<halo_positions[0][3]<<" "<<halo_positions[0][4]<<endl;
+			cout << "2nd halo is " << halo_positions[1][0] <<" "<<halo_positions[1][1]<<" "
+					<<halo_positions[1][2]<<" "<<halo_positions[1][3]<<" "<<halo_positions[1][4]<<endl;
+			cout << "...." << endl;
+			cout << halo_positions.size()<<"th halo is " << halo_positions.back()[0] <<" "
+					<<halo_positions.back()[1]<<" "<<halo_positions.back()[2]<<" "
+					<<halo_positions.back()[3]<<" "<<halo_positions.back()[4]<<endl;
+
 		/* Master does its part of the work */
 		offset = 0;
 		vector<vector<double> > coord_count = initcoordinate(resolution,
 				xarray[0], xarray[chunksize - 1]);
 		//vector<vector<float> > coord_count = initcoordinate(resolution,
 		//		xarray[0], xarray[chunksize - 1]);
-		printf("Task %d coordinates start from %e, %e, %e, %e\n", taskid,
+		printf("Task %d coordinates start with %e, %e, %e, %e\n", taskid,
 		coord_count[0][0], coord_count[0][1], coord_count[0][2], coord_count[0][3]);
 
 		printf("Task 0 has %d coordinates.\n", (int)coord_count.size());
@@ -330,6 +347,7 @@ int main(int argc, char *argv[]) {
 		}
 		printf("\nTotal number of uncertain cases is %d.\n", num_uncertain);
 
+		printf("\nPrinting all counts including uncertain cases:\n");
 		// treat all uncertain cases as inside the cells and add uncertainty to counts
 		for (unsigned long int i = 0; i < ARRAYSIZE*ARRAYSIZE*ARRAYSIZE; ++i) {
 			// original counts overwritten by counts including uncertain cases
@@ -418,12 +436,19 @@ int main(int argc, char *argv[]) {
 		minusplusfile.close();
 		cout << "\nError bars saved in file " << minusplusfilename << "." << endl;
 		endtime = MPI_Wtime();
-		printf("\nTime is %e seconds.\n", endtime-starttime);
+		printf("\nTime taken is %e seconds.\n", endtime-starttime);
 	} /* end of master section */
 
 	/***** Non-master tasks only *****/
 
 	if (taskid > MASTER) {
+
+		/* Load halo catalog */
+		//printf("Task %d is loading halo catalog...\n", taskid);
+		//vector<vector<float> > halo_positions = genfromtxt();
+		//vector<vector<float> > halo_positions = genfromFOF(512);
+		vector<vector<float> > halo_positions = genfrombin();
+		printf("Task %d finished loading halo catalog.\n", taskid);
 
 		/* Receive my portion of array from the master task */
 		source = MASTER;
@@ -435,7 +460,7 @@ int main(int argc, char *argv[]) {
 				xarray[offset], xarray[offset + chunksize - 1]);
 		//vector<vector<float> > coord_count = initcoordinate(resolution,
 		//		xarray[offset], xarray[offset + chunksize - 1]);
-		printf("Task %d coordinates start from %e, %e, %e, %e\n", taskid,
+		printf("Task %d coordinates start with %e, %e, %e, %e\n", taskid,
 				coord_count[0][0], coord_count[0][1], coord_count[0][2], coord_count[0][3]);
 		printf("Task %d has %lu coordinates.\n", taskid, coord_count.size());
 
