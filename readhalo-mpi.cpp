@@ -16,7 +16,7 @@
 //#define  CELL		25.0
 #define  MASTER		0
 
-const int ARRAYSIZE = 40; //number of grids on one side of a cubic box
+const int ARRAYSIZE = 6; //number of grids on one side of a cubic box
 const int CELL = 25;  //in Mpc/h
 const double unit_l = 0.277801161516035e+28;  //in cm
 const double h = 0.720000000000000;
@@ -120,6 +120,29 @@ vector<vector<float> > genfrombin(){
 
 // function to initialize coordiante grid and count
 
+vector<vector<double> > initcoordinate(double resolution, int chunksize, int rank) {
+	// generate x and y with rank of process. linearly divide xy plane into chunks
+	vector<vector<double> > coordinates;
+	printf("Task %d initializing coordinates....\n", rank);
+	for (double z = resolution / 2; z < 1; z = z + resolution) {
+		for (int i = 0; i < chunksize; i++) {
+			vector<double> coordinate;
+			coordinate.push_back((rank*chunksize+i)%ARRAYSIZE*resolution+resolution/2);
+			coordinate.push_back((rank*chunksize+i)/ARRAYSIZE*resolution+resolution/2);
+			coordinate.push_back(z);
+			coordinate.push_back(0.0);
+			coordinate.push_back(0.0);
+			coordinates.push_back(coordinate);
+			//cout << coordinate[0] << " ";
+			//cout << coordinate[1] << " ";
+			//cout << coordinate[2] << " ";
+			//cout << coordinate[3] << " ";
+			//cout << coordinate[4] << endl;
+		}
+	}
+	return coordinates;
+}
+/*
 vector<vector<double> > initcoordinate(double resolution, double xmin, double xmax) {
 	vector<vector<double> > coordinates;
 	for (double z = resolution / 2; z < 1; z = z + resolution) {
@@ -143,8 +166,6 @@ vector<vector<double> > initcoordinate(double resolution, double xmin, double xm
 	return coordinates;
 }
 
-// function to initialize coordiante grid and count
-/*
 vector<vector<float> > initcoordinate(float resolution, float xmin, float xmax) {
 	vector<vector<float> > coordinates;
 	for (float z = resolution / 2; z < 1; z = z + resolution) {
@@ -179,10 +200,10 @@ int main(int argc, char *argv[]) {
 	double epsneg = machine_parameter.epsneg;
 	// ARRAYSIZE/numtasks has to an integer
 	// i.e. number of grid on an axis must be divisible by number of processes
-	double xarray[ARRAYSIZE];
+	//double xarray[ARRAYSIZE];
 	//float xarray[ARRAYSIZE];
-	unsigned int counts[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
-	unsigned int uncertainty[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
+	//unsigned int counts[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
+	//unsigned int uncertainty[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
 
 	MPI_Status status;
 
@@ -190,9 +211,10 @@ int main(int argc, char *argv[]) {
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
 	MPI_Comm_rank(MPI_COMM_WORLD, &taskid);
-	chunksize = ARRAYSIZE / numtasks;
-	tag2 = 1;
-	tag1 = 2;
+	// chunksize = ARRAYSIZE / numtasks;
+	chunksize = ARRAYSIZE*ARRAYSIZE/numtasks; // ARRAYSIZE^2 is divisible by numtasks
+	//tag2 = 1;
+	//tag1 = 2;
 	starttime = MPI_Wtime();
 	printf("MPI task %d has started...\n", taskid);
 
@@ -204,15 +226,15 @@ int main(int argc, char *argv[]) {
 		printf("Machine epsneg equals to %.5e.\n", epsneg);
 		printf("Linear resolution is %.7e.\n",resolution);
 
-		/* Initialize the array */
+		/* Initialize the array
 		for (unsigned int i = 0; i < ARRAYSIZE; i++) {
 			xarray[i] = resolution / 2 + i * resolution;
 		}
 		printf("Initialized array element = %e %e .... %e\n", xarray[0], xarray[1],
 				xarray[ARRAYSIZE - 1]);
-
+		*/
 		/* Send each task its portion of the array - master keeps 1st part */
-		offset = chunksize;
+		/*offset = chunksize;
 		for (dest = 1; dest < numtasks; dest++) {
 			MPI_Send(&offset, 1, MPI_INT, dest, tag1, MPI_COMM_WORLD);
 			MPI_Send(&xarray[offset], chunksize, MPI_DOUBLE, dest, tag2,MPI_COMM_WORLD);
@@ -221,14 +243,14 @@ int main(int argc, char *argv[]) {
 					offset);
 			offset = offset + chunksize;
 		}
-
+		*/
 		/* Load halo catalog */
-		//printf("Task %d is loading halo catalog...\n", taskid);
+		printf("Task %d is loading halo catalog...\n", taskid);
 		//vector<vector<float> > halo_positions = genfromtxt();
 		//vector<vector<float> > halo_positions = genfromFOF(512);
 		vector<vector<float> > halo_positions = genfrombin();
 		printf("Task %d finished loading halo catalog.\n", taskid);
-		cout << "1st halo is " << halo_positions[0][0] <<" "<<halo_positions[0][1]<<" "
+		/*cout << "1st halo is " << halo_positions[0][0] <<" "<<halo_positions[0][1]<<" "
 					<<halo_positions[0][2]<<" "<<halo_positions[0][3]<<" "<<halo_positions[0][4]<<endl;
 			cout << "2nd halo is " << halo_positions[1][0] <<" "<<halo_positions[1][1]<<" "
 					<<halo_positions[1][2]<<" "<<halo_positions[1][3]<<" "<<halo_positions[1][4]<<endl;
@@ -236,11 +258,12 @@ int main(int argc, char *argv[]) {
 			cout << halo_positions.size()<<"th halo is " << halo_positions.back()[0] <<" "
 					<<halo_positions.back()[1]<<" "<<halo_positions.back()[2]<<" "
 					<<halo_positions.back()[3]<<" "<<halo_positions.back()[4]<<endl;
-
+		*/
 		/* Master does its part of the work */
-		offset = 0;
-		vector<vector<double> > coord_count = initcoordinate(resolution,
-				xarray[0], xarray[chunksize - 1]);
+		//offset = 0;
+		vector<vector<double> > coord_count = initcoordinate(resolution, chunksize, taskid);
+		//vector<vector<double> > coord_count = initcoordinate(resolution,
+		//		xarray[0], xarray[chunksize - 1]);
 		//vector<vector<float> > coord_count = initcoordinate(resolution,
 		//		xarray[0], xarray[chunksize - 1]);
 		printf("Task %d coordinates start with %e, %e, %e, %e\n", taskid,
@@ -289,22 +312,22 @@ int main(int argc, char *argv[]) {
 		}
 		*/
 		//printf("Task 0 counts are %d %d ....\n", counts[0], counts[1]);
-		for (unsigned long int row = 0; row < coord_count.size(); ++row) {
+		/*for (unsigned long int row = 0; row < coord_count.size(); ++row) {
 			counts[row] = coord_count[row][3];
 			uncertainty[row] = coord_count[row][4];
 			//printf("%d ", counts[row]);
 		}
 		printf("\n");
 		printf("Task 0 counts are %d %d ....\n", counts[0], counts[1]);
-
+		*/
 		/* Wait to receive results from each task */
 		for (int i = 1; i < numtasks; i++) {
 			source = i;
-			MPI_Recv(&offset, 1, MPI_INT, source, tag1, MPI_COMM_WORLD, &status);
-			MPI_Recv(&counts[offset*ARRAYSIZE*ARRAYSIZE], coord_count.size(), MPI_UNSIGNED, source, tag2, MPI_COMM_WORLD, &status);
-			MPI_Recv(&uncertainty[offset*ARRAYSIZE*ARRAYSIZE], coord_count.size(), MPI_UNSIGNED, source, tag2, MPI_COMM_WORLD, &status);
+			//MPI_Recv(&offset, 1, MPI_INT, source, tag1, MPI_COMM_WORLD, &status);
+			//MPI_Recv(&counts[offset*ARRAYSIZE*ARRAYSIZE], coord_count.size(), MPI_UNSIGNED, source, tag2, MPI_COMM_WORLD, &status);
+			//MPI_Recv(&uncertainty[offset*ARRAYSIZE*ARRAYSIZE], coord_count.size(), MPI_UNSIGNED, source, tag2, MPI_COMM_WORLD, &status);
 		}
-
+		/*
 		printf("\nPrinting all counts:\n");
 		for (unsigned long int i = 0; i < ARRAYSIZE*ARRAYSIZE*ARRAYSIZE; ++i) {
 			printf("%d ", counts[i]);
@@ -330,13 +353,13 @@ int main(int argc, char *argv[]) {
 			Nfreq[i] = icount;
 		}
 
-		/*
+
 		printf("\nPrinting N frequencies for every N:\n");
 		for (unsigned int i = 0; i < max_count+1; ++i){
 			cout << Nfreq[i] << " ";
 		}
 		*/
-		countfile.close();
+		/*countfile.close();
 
 		printf("\nTotal counts is %lu.\n", sum);
 		cout << "Counts saved in file " << filename << "." << endl;
@@ -376,12 +399,12 @@ int main(int argc, char *argv[]) {
 			uncertaincountfile << icount << " ";
 			Nfreq_uncertain[i] = icount;
 		}
-		/*
+
 		printf("\nPrinting N uncertain frequencies for every N ....\n");
 		for (unsigned int i = 0; i < max_uncertain_count+1; ++i){
 			cout << Nfreq_uncertain[i] << " ";
 		}
-		*/
+
 		uncertaincountfile.close();
 
 		printf("\nTotal counts after including uncertain cases is %lu.\n", uncertain_sum);
@@ -437,27 +460,28 @@ int main(int argc, char *argv[]) {
 		cout << "\nError bars saved in file " << minusplusfilename << "." << endl;
 		endtime = MPI_Wtime();
 		printf("\nTime taken is %e seconds.\n", endtime-starttime);
-	} /* end of master section */
-
+	}*/ /* end of master section */
+	}
 	/***** Non-master tasks only *****/
 
 	if (taskid > MASTER) {
 
 		/* Load halo catalog */
-		//printf("Task %d is loading halo catalog...\n", taskid);
+		printf("Task %d is loading halo catalog...\n", taskid);
 		//vector<vector<float> > halo_positions = genfromtxt();
 		//vector<vector<float> > halo_positions = genfromFOF(512);
 		vector<vector<float> > halo_positions = genfrombin();
 		printf("Task %d finished loading halo catalog.\n", taskid);
 
 		/* Receive my portion of array from the master task */
-		source = MASTER;
+		/*source = MASTER;
 		MPI_Recv(&offset, 1, MPI_INT, source, tag1, MPI_COMM_WORLD, &status);
 		MPI_Recv(&xarray[offset], chunksize, MPI_DOUBLE, source, tag2, MPI_COMM_WORLD, &status);
 		//MPI_Recv(&xarray[offset], chunksize, MPI_FLOAT, source, tag2, MPI_COMM_WORLD, &status);
-
-		vector<vector<double> > coord_count = initcoordinate(resolution,
-				xarray[offset], xarray[offset + chunksize - 1]);
+		*/
+		vector<vector<double> > coord_count = initcoordinate(resolution, chunksize, taskid);
+		//vector<vector<double> > coord_count = initcoordinate(resolution,
+		//		xarray[offset], xarray[offset + chunksize - 1]);
 		//vector<vector<float> > coord_count = initcoordinate(resolution,
 		//		xarray[offset], xarray[offset + chunksize - 1]);
 		printf("Task %d coordinates start with %e, %e, %e, %e\n", taskid,
@@ -504,9 +528,9 @@ int main(int argc, char *argv[]) {
 			printf("\n");
 		}
 		*/
-
+		/*
 		unsigned long int counts_offset = offset*ARRAYSIZE*ARRAYSIZE;
-		//printf("Task %d counts are %d %d....\n", taskid, counts[counts_offset], counts[counts_offset+1]);
+		printf("Task %d counts are %d %d....\n", taskid, counts[counts_offset], counts[counts_offset+1]);
 		for (unsigned long int row = 0; row < coord_count.size(); ++row) {
 			counts[counts_offset+row] = coord_count[row][3];
 			uncertainty[counts_offset+row] = coord_count[row][4];
@@ -514,12 +538,12 @@ int main(int argc, char *argv[]) {
 		}
 		printf("\n");
 		printf("Task %d counts are %d %d ....\n", taskid, counts[counts_offset], counts[counts_offset+1]);
-
+		*/
 		/* Send my results back to the master task */
 		dest = MASTER;
-		MPI_Send(&offset, 1, MPI_INT, dest, tag1, MPI_COMM_WORLD);
-		MPI_Send(&counts[counts_offset], coord_count.size(), MPI_UNSIGNED, MASTER, tag2, MPI_COMM_WORLD);
-		MPI_Send(&uncertainty[counts_offset], coord_count.size(), MPI_UNSIGNED, MASTER, tag2, MPI_COMM_WORLD);
+		//MPI_Send(&offset, 1, MPI_INT, dest, tag1, MPI_COMM_WORLD);
+		//MPI_Send(&counts[counts_offset], coord_count.size(), MPI_UNSIGNED, MASTER, tag2, MPI_COMM_WORLD);
+		//MPI_Send(&uncertainty[counts_offset], coord_count.size(), MPI_UNSIGNED, MASTER, tag2, MPI_COMM_WORLD);
 
 	} /* end of non-master */
 
