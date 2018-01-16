@@ -16,7 +16,7 @@
 //#define  CELL		25.0
 #define  MASTER		0
 
-const int ARRAYSIZE = 4; //number of grids on one side of a cubic box
+const int ARRAYSIZE = 20; //number of grids on one side of a cubic box
 const int CELL = 25;  //in Mpc/h
 const double unit_l = 0.277801161516035e+28;  //in cm
 const double h = 0.720000000000000;
@@ -190,7 +190,8 @@ vector<vector<float> > initcoordinate(float resolution, float xmin, float xmax) 
 */
 
 int main(int argc, char *argv[]) {
-	int numtasks, taskid, dest, offset, tag1, tag2, source, chunksize;
+	int numtasks, taskid, chunksize;
+	unsigned int max_count, max_uncertain_count, task_max, task_uncertain_max, num_uncertain;
 	double resolution = 1 / (double)ARRAYSIZE;
 	//float resolution = 1/(float)ARRAYSIZE;
 	float starttime, endtime;
@@ -203,8 +204,6 @@ int main(int argc, char *argv[]) {
 	//double xarray[ARRAYSIZE];
 	//float xarray[ARRAYSIZE];
 
-	MPI_Status status;
-
 	/***** Initializations *****/
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
@@ -213,6 +212,7 @@ int main(int argc, char *argv[]) {
 	chunksize = ARRAYSIZE*ARRAYSIZE/numtasks; // ARRAYSIZE^2 is divisible by numtasks
 	unsigned int counts[chunksize*ARRAYSIZE];
 	unsigned int uncertainty[chunksize*ARRAYSIZE];
+	unsigned int uncertain_counts[chunksize*ARRAYSIZE];
 	//tag2 = 1;
 	//tag1 = 2;
 	starttime = MPI_Wtime();
@@ -266,12 +266,48 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	unsigned int task_uncertainty = 0;
 	for (unsigned int row = 0; row < coord_count.size(); ++row) {
 		counts[row] = coord_count[row][3];
 		uncertainty[row] = coord_count[row][4];
+		// treat all uncertain cases as inside the cells and add uncertainty to counts
+		uncertain_counts[row] = counts[row] + uncertainty[row];
+		task_uncertainty += uncertainty[row];
 		//printf("%d ", counts[row]);
 	}
 	printf("Task %d counts are %d %d ....\n", taskid, counts[0], counts[1]);
+	printf("Task %d uncertain counts are %d %d ....\n",
+			taskid, uncertain_counts[0], uncertain_counts[1]);
+
+	task_max = *max_element(counts, counts+chunksize*ARRAYSIZE);
+	printf("Task %d maximum count is %d.\n", taskid, task_max);
+	task_uncertain_max = *max_element(uncertain_counts,
+			uncertain_counts+chunksize*ARRAYSIZE);
+	printf("Task %d maximum uncertain count is %d.\n", taskid, task_uncertain_max);
+
+	MPI_Reduce(&task_uncertainty, &num_uncertain, 1, MPI_UNSIGNED, MPI_SUM, 0, MPI_COMM_WORLD);
+	MPI_Reduce(&task_max, &max_count, 1, MPI_UNSIGNED, MPI_MAX, 0, MPI_COMM_WORLD);
+	MPI_Bcast(&max_count, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
+	MPI_Reduce(&task_uncertain_max, &max_uncertain_count, 1, MPI_UNSIGNED, MPI_MAX, 0, MPI_COMM_WORLD);
+	MPI_Bcast(&max_uncertain_count, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
+
+	unsigned int task_sum = 0;
+	unsigned int task_Nfreq[max_uncertain_count+1];
+	unsigned int task_uncertain_Nfreq[max_uncertain_count+1];
+	for (unsigned int i = 0; i < max_count +1; ++i){
+		// loop to count the occurrences in vector
+		task_Nfreq[i] = count(counts, counts+chunksize*ARRAYSIZE, i);
+		task_uncertain_Nfreq[i] =
+				count(uncertain_counts, uncertain_counts+chunksize*ARRAYSIZE, i);
+		task_sum = task_sum + task_Nfreq[i];
+		//cout << task_Nfreq[i] << " ";
+	}
+
+	unsigned int Nfreq[max_uncertain_count+1];
+	MPI_Reduce(&task_Nfreq, &Nfreq, max_uncertain_count+1, MPI_UNSIGNED, MPI_SUM, 0, MPI_COMM_WORLD);
+	unsigned int Nfreq_uncertain[max_uncertain_count + 1];
+	MPI_Reduce(&task_uncertain_Nfreq, &Nfreq_uncertain, max_uncertain_count+1, MPI_UNSIGNED, MPI_SUM, 0, MPI_COMM_WORLD);
+
 
 	/***** Master task only ******/
 	if (taskid == MASTER) {
@@ -281,123 +317,43 @@ int main(int argc, char *argv[]) {
 		printf("Machine epsneg equals to %.5e.\n", epsneg);
 		printf("Linear resolution is %.7e.\n",resolution);
 
-		/* Initialize the array
-		for (unsigned int i = 0; i < ARRAYSIZE; i++) {
-			xarray[i] = resolution / 2 + i * resolution;
-		}
-		printf("Initialized array element = %e %e .... %e\n", xarray[0], xarray[1],
-				xarray[ARRAYSIZE - 1]);
-		*/
-		/* Send each task its portion of the array - master keeps 1st part */
-		/*offset = chunksize;
-		for (dest = 1; dest < numtasks; dest++) {
-			MPI_Send(&offset, 1, MPI_INT, dest, tag1, MPI_COMM_WORLD);
-			MPI_Send(&xarray[offset], chunksize, MPI_DOUBLE, dest, tag2,MPI_COMM_WORLD);
-			//MPI_Send(&xarray[offset], chunksize, MPI_FLOAT, dest, tag2,MPI_COMM_WORLD);
-			printf("Sent %d elements to task %d offset= %d\n", chunksize, dest,
-					offset);
-			offset = offset + chunksize;
-		}
-		*/
-
-		/*
-		for (unsigned long int row = 0; row < coord_count.size(); row++) {
-			for (int col = 0; col < 4; col++) {
-				cout << coord_count[row][col] << " ";
-			}
-			printf("\n");
-		}
-		*/
-		//printf("Task 0 counts are %d %d ....\n", counts[0], counts[1]);
-
-		/* Wait to receive results from each task */
-		for (int i = 1; i < numtasks; i++) {
-			source = i;
-			//MPI_Recv(&offset, 1, MPI_INT, source, tag1, MPI_COMM_WORLD, &status);
-			//MPI_Recv(&counts[offset*ARRAYSIZE*ARRAYSIZE], coord_count.size(), MPI_UNSIGNED, source, tag2, MPI_COMM_WORLD, &status);
-			//MPI_Recv(&uncertainty[offset*ARRAYSIZE*ARRAYSIZE], coord_count.size(), MPI_UNSIGNED, source, tag2, MPI_COMM_WORLD, &status);
-		}
-		/*
-		printf("\nPrinting all counts:\n");
-		for (unsigned long int i = 0; i < ARRAYSIZE*ARRAYSIZE*ARRAYSIZE; ++i) {
-			printf("%d ", counts[i]);
-		}
-		printf("\n");
-
-		unsigned int max_count = *max_element(counts, counts+ARRAYSIZE*ARRAYSIZE*ARRAYSIZE);
-		printf("\nMaximum count is %d.\n", max_count);
+		printf("\nTotal number of uncertain cases is %d.\n", num_uncertain);
+		printf("Global maximum count is %d.\n", max_count);
+		printf("Global maxium uncertain count is %d.\n", max_uncertain_count);
 
 		ofstream countfile;
 		string filename = "freq_cell_"+to_string(CELL)+"_size_"+to_string(ARRAYSIZE)+"_p_"+to_string(numtasks)+".txt";
 		countfile.open(filename);
 
-		unsigned long int sum = 0;
-		vector<int> Nfreq(max_count+1);
+		unsigned int sum = 0;
 		printf("\nPrinting counts for every N ....\n");
-		for (unsigned int i = 0; i < max_count +1; ++i){
-			// loop to count the occurrences in vector
-			unsigned int icount = count(counts, counts+ARRAYSIZE*ARRAYSIZE*ARRAYSIZE, i);
-			sum = sum + icount;
-			cout << icount << " ";
-			countfile << icount << " ";
-			Nfreq[i] = icount;
+		for (unsigned int i = 0; i < max_uncertain_count +1; ++i){
+			printf("%d ", Nfreq[i]);
+			sum += Nfreq[i];
+			countfile << Nfreq[i] << " ";
 		}
 
+		countfile.close();
 
-		printf("\nPrinting N frequencies for every N:\n");
-		for (unsigned int i = 0; i < max_count+1; ++i){
-			cout << Nfreq[i] << " ";
-		}
-		*/
-		/*countfile.close();
-
-		printf("\nTotal counts is %lu.\n", sum);
+		printf("\nTotal counts is %u.\n", sum);
 		cout << "Counts saved in file " << filename << "." << endl;
-
-		unsigned int num_uncertain = 0;
-		for (unsigned long int i = 0; i < ARRAYSIZE*ARRAYSIZE*ARRAYSIZE; ++i) {
-			num_uncertain += uncertainty[i];
-		}
-		printf("\nTotal number of uncertain cases is %d.\n", num_uncertain);
-
-		printf("\nPrinting all counts including uncertain cases:\n");
-		// treat all uncertain cases as inside the cells and add uncertainty to counts
-		for (unsigned long int i = 0; i < ARRAYSIZE*ARRAYSIZE*ARRAYSIZE; ++i) {
-			// original counts overwritten by counts including uncertain cases
-			counts[i] = counts[i] + uncertainty[i];
-			printf("%d ", counts[i]);
-		}
-		printf("\n");
-
-		unsigned int max_uncertain_count = *max_element(counts,
-				counts + ARRAYSIZE * ARRAYSIZE * ARRAYSIZE);
-		printf("\nMaximum uncertain count is %d.\n", max_uncertain_count);
 
 		ofstream uncertaincountfile;
 		string fileuncertain = "uncertain_cell_" + to_string(CELL) + "_size_"
 				+ to_string(ARRAYSIZE) + "_p_" + to_string(numtasks) + ".txt";
 		uncertaincountfile.open(fileuncertain);
 
-		unsigned long int uncertain_sum = 0;
-		vector <int> Nfreq_uncertain(max_uncertain_count + 1);
-		printf("\nPrinting counts for every N ....\n");
+		unsigned int uncertain_sum = 0;
+		printf("\nPrinting uncertain counts for every N ....\n");
 		for (unsigned int i = 0; i < max_uncertain_count + 1; ++i) {
-			// loop to count the occurrences in vector
-			unsigned int icount = count(counts, counts + ARRAYSIZE * ARRAYSIZE * ARRAYSIZE, i);
-			uncertain_sum = uncertain_sum + icount;
-			cout << icount << " ";
-			uncertaincountfile << icount << " ";
-			Nfreq_uncertain[i] = icount;
-		}
-
-		printf("\nPrinting N uncertain frequencies for every N ....\n");
-		for (unsigned int i = 0; i < max_uncertain_count+1; ++i){
-			cout << Nfreq_uncertain[i] << " ";
+			printf("%d ", Nfreq_uncertain[i]);
+			uncertain_sum += Nfreq_uncertain[i];
+			uncertaincountfile << Nfreq_uncertain[i] << " ";
 		}
 
 		uncertaincountfile.close();
 
-		printf("\nTotal counts after including uncertain cases is %lu.\n", uncertain_sum);
+		printf("\nTotal counts after including uncertain cases is %d.\n", uncertain_sum);
 		cout << "Counts with uncertain cases saved in file " << fileuncertain << "." << endl;
 
 		// store plus/minus error in 2*N long array
@@ -407,28 +363,8 @@ int main(int argc, char *argv[]) {
 		minusplusfile.open(minusplusfilename);
 		int minusplus[2*max_uncertain_count+2];
 		int totaluncertain = 0;
-		printf("\nPrinting error bars of every N ....\n");
-		if (max_count < max_uncertain_count){
-			// append zeros to Nfreq if Nfreq is shorter than Nfreq_uncertain
-			vector <int> zeros(max_uncertain_count-max_count, 0);
-			Nfreq.insert(Nfreq.end(), zeros.begin(), zeros.end());
-			if (Nfreq.size() == Nfreq_uncertain.size()){
-				printf("\nAdded zeros after maximum count of N.\n");
-				minusplus[0] = Nfreq[0]-Nfreq_uncertain[0];
-				minusplus[1] = 0;
-				minusplusfile << minusplus[0] << " " << minusplus[1] << " ";
-				for (unsigned int i = 1; i < max_uncertain_count +1; ++i){
-					//i'th lower error = i'th count + (i-1)th lower error - i'th uncertain count
-					minusplus[2*i] = Nfreq[i] + minusplus[2*i-2] - Nfreq_uncertain[i];
-					//i'th upper error = (i-1)th lower error
-					minusplus[2*i+1] = minusplus[2*i-2];
-					minusplusfile << minusplus[2*i] << " " << minusplus[2*i+1] << " ";
-					totaluncertain += minusplus[2*i+1];
-				}
-				printf("\nTotal number of uncertain cases is %d.\n", totaluncertain);
-			}
-		}
-		else if (max_count == max_uncertain_count){
+		//printf("\nPrinting error bars of every N ....\n");
+		if (max_count == max_uncertain_count){
 			//for every N, write lower error, then upper error
 			minusplus[0] = Nfreq[0]-Nfreq_uncertain[0];
 			minusplus[1] = 0;
@@ -450,44 +386,8 @@ int main(int argc, char *argv[]) {
 		cout << "\nError bars saved in file " << minusplusfilename << "." << endl;
 		endtime = MPI_Wtime();
 		printf("\nTime taken is %e seconds.\n", endtime-starttime);
-	}*/ /* end of master section */
 	}
-	/***** Non-master tasks only *****/
-
-	if (taskid > MASTER) {
-
-		/* Receive my portion of array from the master task */
-		/*source = MASTER;
-		MPI_Recv(&offset, 1, MPI_INT, source, tag1, MPI_COMM_WORLD, &status);
-		MPI_Recv(&xarray[offset], chunksize, MPI_DOUBLE, source, tag2, MPI_COMM_WORLD, &status);
-		//MPI_Recv(&xarray[offset], chunksize, MPI_FLOAT, source, tag2, MPI_COMM_WORLD, &status);
-		*/
-		/*
-		for (unsigned long int row = 0; row < coord_count.size(); ++row) {
-			for (int col = 0; col < 4; col++) {
-				cout << coord_count[row][col] << " ";
-			}
-			printf("\n");
-		}
-		*/
-		/*
-		unsigned long int counts_offset = offset*ARRAYSIZE*ARRAYSIZE;
-		printf("Task %d counts are %d %d....\n", taskid, counts[counts_offset], counts[counts_offset+1]);
-		for (unsigned long int row = 0; row < coord_count.size(); ++row) {
-			counts[counts_offset+row] = coord_count[row][3];
-			uncertainty[counts_offset+row] = coord_count[row][4];
-			//printf("%d ", counts[counts_offset+row]);
-		}
-		printf("\n");
-		printf("Task %d counts are %d %d ....\n", taskid, counts[counts_offset], counts[counts_offset+1]);
-		*/
-		/* Send my results back to the master task */
-		//dest = MASTER;
-		//MPI_Send(&offset, 1, MPI_INT, dest, tag1, MPI_COMM_WORLD);
-		//MPI_Send(&counts[counts_offset], coord_count.size(), MPI_UNSIGNED, MASTER, tag2, MPI_COMM_WORLD);
-		//MPI_Send(&uncertainty[counts_offset], coord_count.size(), MPI_UNSIGNED, MASTER, tag2, MPI_COMM_WORLD);
-
-	} /* end of non-master */
+	/* end of master section */
 
 	MPI_Finalize();
 	return 0;
