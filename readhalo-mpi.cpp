@@ -16,7 +16,7 @@
 //#define  CELL		25.0
 #define  MASTER		0
 
-const int ARRAYSIZE = 6; //number of grids on one side of a cubic box
+const int ARRAYSIZE = 4; //number of grids on one side of a cubic box
 const int CELL = 25;  //in Mpc/h
 const double unit_l = 0.277801161516035e+28;  //in cm
 const double h = 0.720000000000000;
@@ -202,8 +202,6 @@ int main(int argc, char *argv[]) {
 	// i.e. number of grid on an axis must be divisible by number of processes
 	//double xarray[ARRAYSIZE];
 	//float xarray[ARRAYSIZE];
-	//unsigned int counts[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
-	//unsigned int uncertainty[ARRAYSIZE*ARRAYSIZE*ARRAYSIZE];
 
 	MPI_Status status;
 
@@ -213,10 +211,67 @@ int main(int argc, char *argv[]) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &taskid);
 	// chunksize = ARRAYSIZE / numtasks;
 	chunksize = ARRAYSIZE*ARRAYSIZE/numtasks; // ARRAYSIZE^2 is divisible by numtasks
+	unsigned int counts[chunksize*ARRAYSIZE];
+	unsigned int uncertainty[chunksize*ARRAYSIZE];
 	//tag2 = 1;
 	//tag1 = 2;
 	starttime = MPI_Wtime();
 	printf("MPI task %d has started...\n", taskid);
+	/* Load halo catalog */
+	printf("Task %d is loading halo catalog...\n", taskid);
+	//vector<vector<float> > halo_positions = genfromtxt();
+	//vector<vector<float> > halo_positions = genfromFOF(512);
+	vector<vector<float> > halo_positions = genfrombin();
+	printf("Task %d finished loading halo catalog.\n", taskid);
+
+	vector<vector<double> > coord_count = initcoordinate(resolution, chunksize, taskid);
+	//vector<vector<double> > coord_count = initcoordinate(resolution,
+	//		xarray[offset], xarray[offset + chunksize - 1]);
+	//vector<vector<float> > coord_count = initcoordinate(resolution,
+	//		xarray[offset], xarray[offset + chunksize - 1]);
+	printf("Task %d coordinates start with %e, %e, %e, %e\n", taskid,
+			coord_count[0][0], coord_count[0][1], coord_count[0][2], coord_count[0][3]);
+	printf("Task %d has %lu coordinates.\n", taskid, coord_count.size());
+
+	for (unsigned long int i = 0; i < coord_count.size(); ++i){
+		for (unsigned int j = 0; j < halo_positions.size(); ++j){
+			double ratio = ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
+					   	   +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
+						   +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2]))
+						   /(radius*radius);
+			if (ratio <= double(1.0))
+			{
+				if (double(1.0)-ratio > epsneg)
+				{
+					coord_count[i][3] = coord_count[i][3] + 1;
+				}
+				else
+				{
+					coord_count[i][4] = coord_count[i][4] + 1;
+					printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
+							halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
+							coord_count[i][0], coord_count[i][1], coord_count[i][2]);
+				}
+			}
+			else
+			{
+				if (ratio-double(1.0) < eps)
+				{
+					coord_count[i][4] = coord_count[i][4] + 1;
+					printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
+							halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
+							coord_count[i][0], coord_count[i][1], coord_count[i][2]);
+				}
+			}
+		}
+	}
+
+	for (unsigned int row = 0; row < coord_count.size(); ++row) {
+		counts[row] = coord_count[row][3];
+		uncertainty[row] = coord_count[row][4];
+		//printf("%d ", counts[row]);
+	}
+	printf("Task %d counts are %d %d ....\n", taskid, counts[0], counts[1]);
 
 	/***** Master task only ******/
 	if (taskid == MASTER) {
@@ -244,65 +299,7 @@ int main(int argc, char *argv[]) {
 			offset = offset + chunksize;
 		}
 		*/
-		/* Load halo catalog */
-		printf("Task %d is loading halo catalog...\n", taskid);
-		//vector<vector<float> > halo_positions = genfromtxt();
-		//vector<vector<float> > halo_positions = genfromFOF(512);
-		vector<vector<float> > halo_positions = genfrombin();
-		printf("Task %d finished loading halo catalog.\n", taskid);
-		/*cout << "1st halo is " << halo_positions[0][0] <<" "<<halo_positions[0][1]<<" "
-					<<halo_positions[0][2]<<" "<<halo_positions[0][3]<<" "<<halo_positions[0][4]<<endl;
-			cout << "2nd halo is " << halo_positions[1][0] <<" "<<halo_positions[1][1]<<" "
-					<<halo_positions[1][2]<<" "<<halo_positions[1][3]<<" "<<halo_positions[1][4]<<endl;
-			cout << "...." << endl;
-			cout << halo_positions.size()<<"th halo is " << halo_positions.back()[0] <<" "
-					<<halo_positions.back()[1]<<" "<<halo_positions.back()[2]<<" "
-					<<halo_positions.back()[3]<<" "<<halo_positions.back()[4]<<endl;
-		*/
-		/* Master does its part of the work */
-		//offset = 0;
-		vector<vector<double> > coord_count = initcoordinate(resolution, chunksize, taskid);
-		//vector<vector<double> > coord_count = initcoordinate(resolution,
-		//		xarray[0], xarray[chunksize - 1]);
-		//vector<vector<float> > coord_count = initcoordinate(resolution,
-		//		xarray[0], xarray[chunksize - 1]);
-		printf("Task %d coordinates start with %e, %e, %e, %e\n", taskid,
-		coord_count[0][0], coord_count[0][1], coord_count[0][2], coord_count[0][3]);
 
-		printf("Task 0 has %d coordinates.\n", (int)coord_count.size());
-
-		for (unsigned long int i = 0; i < coord_count.size(); ++i){
-			for (unsigned int j = 0; j < halo_positions.size(); ++j){
-				double ratio = ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
-						   	   +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
-							   +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2]))
-							   /(radius*radius);
-				if (ratio <= double(1.0))
-				{
-					if (double(1.0)-ratio > epsneg)
-					{
-						coord_count[i][3] = coord_count[i][3] + 1;
-					}
-					else
-					{
-						coord_count[i][4] = coord_count[i][4] + 1;
-						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
-								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
-								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
-					}
-				}
-				else
-				{
-					if (ratio-double(1.0) < eps)
-					{
-						coord_count[i][4] = coord_count[i][4] + 1;
-						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
-								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
-								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
-					}
-				}
-			}
-		}
 		/*
 		for (unsigned long int row = 0; row < coord_count.size(); row++) {
 			for (int col = 0; col < 4; col++) {
@@ -312,14 +309,7 @@ int main(int argc, char *argv[]) {
 		}
 		*/
 		//printf("Task 0 counts are %d %d ....\n", counts[0], counts[1]);
-		/*for (unsigned long int row = 0; row < coord_count.size(); ++row) {
-			counts[row] = coord_count[row][3];
-			uncertainty[row] = coord_count[row][4];
-			//printf("%d ", counts[row]);
-		}
-		printf("\n");
-		printf("Task 0 counts are %d %d ....\n", counts[0], counts[1]);
-		*/
+
 		/* Wait to receive results from each task */
 		for (int i = 1; i < numtasks; i++) {
 			source = i;
@@ -466,60 +456,12 @@ int main(int argc, char *argv[]) {
 
 	if (taskid > MASTER) {
 
-		/* Load halo catalog */
-		printf("Task %d is loading halo catalog...\n", taskid);
-		//vector<vector<float> > halo_positions = genfromtxt();
-		//vector<vector<float> > halo_positions = genfromFOF(512);
-		vector<vector<float> > halo_positions = genfrombin();
-		printf("Task %d finished loading halo catalog.\n", taskid);
-
 		/* Receive my portion of array from the master task */
 		/*source = MASTER;
 		MPI_Recv(&offset, 1, MPI_INT, source, tag1, MPI_COMM_WORLD, &status);
 		MPI_Recv(&xarray[offset], chunksize, MPI_DOUBLE, source, tag2, MPI_COMM_WORLD, &status);
 		//MPI_Recv(&xarray[offset], chunksize, MPI_FLOAT, source, tag2, MPI_COMM_WORLD, &status);
 		*/
-		vector<vector<double> > coord_count = initcoordinate(resolution, chunksize, taskid);
-		//vector<vector<double> > coord_count = initcoordinate(resolution,
-		//		xarray[offset], xarray[offset + chunksize - 1]);
-		//vector<vector<float> > coord_count = initcoordinate(resolution,
-		//		xarray[offset], xarray[offset + chunksize - 1]);
-		printf("Task %d coordinates start with %e, %e, %e, %e\n", taskid,
-				coord_count[0][0], coord_count[0][1], coord_count[0][2], coord_count[0][3]);
-		printf("Task %d has %lu coordinates.\n", taskid, coord_count.size());
-
-		for (unsigned long int i = 0; i < coord_count.size(); ++i){
-			for (unsigned int j = 0; j < halo_positions.size(); ++j){
-				double ratio = ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
-						   	   +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
-							   +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2]))
-							   /(radius*radius);
-				if (ratio <= double(1.0))
-				{
-					if (double(1.0)-ratio > epsneg)
-					{
-						coord_count[i][3] = coord_count[i][3] + 1;
-					}
-					else
-					{
-						coord_count[i][4] = coord_count[i][4] + 1;
-						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
-								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
-								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
-					}
-				}
-				else
-				{
-					if (ratio-double(1.0) < eps)
-					{
-						coord_count[i][4] = coord_count[i][4] + 1;
-						printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
-								halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
-								coord_count[i][0], coord_count[i][1], coord_count[i][2]);
-					}
-				}
-			}
-		}
 		/*
 		for (unsigned long int row = 0; row < coord_count.size(); ++row) {
 			for (int col = 0; col < 4; col++) {
@@ -540,7 +482,7 @@ int main(int argc, char *argv[]) {
 		printf("Task %d counts are %d %d ....\n", taskid, counts[counts_offset], counts[counts_offset+1]);
 		*/
 		/* Send my results back to the master task */
-		dest = MASTER;
+		//dest = MASTER;
 		//MPI_Send(&offset, 1, MPI_INT, dest, tag1, MPI_COMM_WORLD);
 		//MPI_Send(&counts[counts_offset], coord_count.size(), MPI_UNSIGNED, MASTER, tag2, MPI_COMM_WORLD);
 		//MPI_Send(&uncertainty[counts_offset], coord_count.size(), MPI_UNSIGNED, MASTER, tag2, MPI_COMM_WORLD);
