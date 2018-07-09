@@ -17,7 +17,7 @@
 #define  MASTER		0
 
 const int ARRAYSIZE = 20; //number of grids on one side of a cubic box
-const int CELL = 25;  //in Mpc/h
+const double CELL = 10.052941;  //in Mpc/h
 const double unit_l = 0.277801161516035e+28;  //in cm
 const double h = 0.720000000000000;
 const double Mpc = 3.085677581e+24;  // cm per Mpc
@@ -222,7 +222,7 @@ int main(int argc, char *argv[]) {
 	//vector<vector<float> > halo_positions = genfromtxt();
 	//vector<vector<float> > halo_positions = genfromFOF(512);
 	vector<vector<float> > halo_positions = genfrombin();
-	printf("Task %d finished loading halo catalog.\n", taskid);
+	printf("Task %d finished loading %ld halos.\n", taskid, halo_positions.size());
 
 	vector<vector<double> > coord_count = initcoordinate(resolution, chunksize, taskid);
 	//vector<vector<double> > coord_count = initcoordinate(resolution,
