@@ -8,7 +8,7 @@
 #include "FOFReaderLib/FOFReaderLib.h"
 //#include <chrono>
 #include <mpi.h>
-#include <omp.h>
+//#include <omp.h>
 //#include <cmath>
 //#include <math.h>
 #include "machar.h"
@@ -17,8 +17,8 @@
 //#define  CELL		25.0
 #define  MASTER		0
 
-const int ARRAYSIZE = 20; //number of grids on one side of a cubic box
-const double CELL = 10.052941;  //in Mpc/h
+const int ARRAYSIZE = 512; //number of grids on one side of a cubic box
+const double CELL = 10;  //10.052941;  //in Mpc/h
 const double unit_l = 0.277801161516035e+28;  //in cm
 const double h = 0.720000000000000;
 const double Mpc = 3.085677581e+24;  // cm per Mpc
@@ -235,14 +235,32 @@ int main(int argc, char *argv[]) {
 
 	unsigned long int coordnum = coord_count.size();
 	unsigned int halonum = halo_positions.size();
-	omp_set_nested(1);
-	#pragma omp parallel for
+	//omp_set_nested(1);
+	//#pragma omp parallel for
 	for (unsigned long int i = 0; i < coordnum; ++i){
 	        for (unsigned int j = 0; j < halonum; ++j){
+	//for(unsigned int j = 0; j < halonum; ++j){
+		//for (unsigned long int i = 0; i <coordnum; ++i){
+			double hpj2 = halo_positions[j][2];
+			double hpj3 = halo_positions[j][3];
+			double hpj4 = halo_positions[j][4];
+			double cci0 = coord_count[i][0];
+			double cci1 = coord_count[i][1];
+			double cci2 = coord_count[i][2];
+			double h2c0 = hpj2 - cci0;
+			double h3c1 = hpj3 - cci1;
+			double h4c2 = hpj4 - cci2;
+			double sq20 = h2c0 * h2c0;
+			double sq31 = h3c1 * h3c1;
+			double sq42 = h4c2 * h4c2;
+			double sqhc = sq20 + sq31 + sq42;
+			double ratio = sqhc / radiussq;
+			/*
 			double ratio = ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
-					   	   +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
-						   +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2]))
-						   /(radiussq);
+				       +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
+				       +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2]))
+				       /radiussq;
+			*/
 			if (ratio <= double(1.0))
 			{
 				if (double(1.0)-ratio > epsneg)

@@ -5,7 +5,7 @@ CC=CC
 #FFLAGS=-h profile_generate
 #CFLAGS=-c -fast -qopt-report -no-ipo -qno-openmp -std=c++11
 #CFLAGS=-c -Wall -O3 -g -pg -fopenmp -std=c++11
-CFLAGS=-c -Wall -O3 -fopenmp -std=c++11
+CFLAGS=-c -Wall -O0 -fopenmp -std=c++11
 LDFLAGS=-fopenmp
 SOURCES= FOFReaderLib/FOFFiles/FOFCube.cpp \
     FOFReaderLib/FOFFiles/FOFFile.cpp \
@@ -26,8 +26,8 @@ SOURCES= FOFReaderLib/FOFFiles/FOFCube.cpp \
 OBJECTS=$(SOURCES:.cpp=.o)
 
 all: $(SOURCES) FOFReader getAreaFiles getBiggestHalo exportMasst generateImage \
-				generateRandomCube readhalo-mpi savebin uniformhalo ranhalo
-	
+				generateRandomCube readhalo-mpi savebin uniformhalo \
+#				ranhalo
 FOFReader: FOFReader.o $(OBJECTS) 
 	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@
 	
@@ -55,8 +55,8 @@ savebin: savebin.o $(OBJECTS)
 uniformhalo: uniformhalo.o $(OBJECTS) 
 	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@	
 
-ranhalo: ranhalo.o $(OBJECTS) 
-	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@	-lgsl -lgslcblas -lm
+#ranhalo: ranhalo.o $(OBJECTS) 
+#	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@	-lgsl -lgslcblas -lm
 	
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@
