@@ -89,19 +89,19 @@ vector<vector<float> > genfromtxt() {
 	return halo_positions;
 }
 
-vector<vector<float> > genfrombin(){
+vector<vector<double> > genfrombin(){
 	ifstream in("halo_positions.bin",ios_base::binary);
 	//ifstream in("uniform_0.05.bin",ios_base::binary);
 	in.seekg(0,ios::end);
-	int length = in.tellg();
+	unsigned int length = in.tellg();
 	in.seekg(0,ios::beg);
 	//cout << "Input halo positions data size is " << length << " bytes."<< endl;
-	vector<vector <float> > read_positions;
+	vector<vector <double> > read_positions;
 	if(in.good())
 	{
-		vector<float> row(5);
-		for (unsigned int i=0; i<length/(5*sizeof(float)); ++i){
-			in.read((char *)&row[0],5*sizeof(float));
+		vector<double> row(3);
+		for (unsigned int i=0; i<length/(3*sizeof(double)); ++i){
+			in.read((char *)&row[0],3*sizeof(double));
 			read_positions.push_back(row);
 		}
 	}
@@ -126,12 +126,10 @@ vector<vector<double> > initcoordinate(double resolution, int chunksize, int ran
 	printf("Task %d initializing coordinates....\n", rank);
 	for (double z = resolution / 2; z < 1; z = z + resolution) {
 		for (int i = 0; i < chunksize; i++) {
-			vector<double> coordinate;
-			coordinate.push_back((rank*chunksize+i)%ARRAYSIZE*resolution+resolution/2);
-			coordinate.push_back((rank*chunksize+i)/ARRAYSIZE*resolution+resolution/2);
-			coordinate.push_back(z);
-			coordinate.push_back(0.0);
-			coordinate.push_back(0.0);
+			vector<double> coordinate{(rank*chunksize+i)%ARRAYSIZE*resolution+resolution/2,
+				(rank*chunksize+i)/ARRAYSIZE*resolution+resolution/2, z};
+			//coordinate.push_back(0.0);
+			//coordinate.push_back(0.0);
 			coordinates.push_back(coordinate);
 			//cout << coordinate[0] << " ";
 			//cout << coordinate[1] << " ";
@@ -210,9 +208,9 @@ int main(int argc, char *argv[]) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &taskid);
 	// chunksize = ARRAYSIZE / numtasks;
 	chunksize = ARRAYSIZE*ARRAYSIZE/numtasks; // ARRAYSIZE^2 is divisible by numtasks
-	unsigned int counts[chunksize*ARRAYSIZE];
-	unsigned int uncertainty[chunksize*ARRAYSIZE];
-	unsigned int uncertain_counts[chunksize*ARRAYSIZE];
+	unsigned int counts[chunksize*ARRAYSIZE] = {0};
+	unsigned int uncertainty[chunksize*ARRAYSIZE] = {0};
+	unsigned int uncertain_counts[chunksize*ARRAYSIZE] = {0};
 	//tag2 = 1;
 	//tag1 = 2;
 	starttime = MPI_Wtime();
@@ -221,7 +219,7 @@ int main(int argc, char *argv[]) {
 	printf("Task %d is loading halo catalog...\n", taskid);
 	//vector<vector<float> > halo_positions = genfromtxt();
 	//vector<vector<float> > halo_positions = genfromFOF(512);
-	vector<vector<float> > halo_positions = genfrombin();
+	vector<vector<double> > halo_positions = genfrombin();
 	printf("Task %d finished loading %ld halos.\n", taskid, halo_positions.size());
 
 	vector<vector<double> > coord_count = initcoordinate(resolution, chunksize, taskid);
@@ -241,6 +239,7 @@ int main(int argc, char *argv[]) {
 	        for (unsigned int j = 0; j < halonum; ++j){
 	//for(unsigned int j = 0; j < halonum; ++j){
 		//for (unsigned long int i = 0; i <coordnum; ++i){
+			/*
 			double hpj2 = halo_positions[j][2];
 			double hpj3 = halo_positions[j][3];
 			double hpj4 = halo_positions[j][4];
@@ -255,23 +254,23 @@ int main(int argc, char *argv[]) {
 			double sq42 = h4c2 * h4c2;
 			double sqhc = sq20 + sq31 + sq42;
 			double ratio = sqhc / radiussq;
-			/*
-			double ratio = ((halo_positions[j][2]-coord_count[i][0])*(halo_positions[j][2]-coord_count[i][0])
-				       +(halo_positions[j][3]-coord_count[i][1])*(halo_positions[j][3]-coord_count[i][1])
-				       +(halo_positions[j][4]-coord_count[i][2])*(halo_positions[j][4]-coord_count[i][2]))
-				       /radiussq;
 			*/
+			double ratio = ((halo_positions[j][0]-coord_count[i][0])*(halo_positions[j][0]-coord_count[i][0])
+				       +(halo_positions[j][1]-coord_count[i][1])*(halo_positions[j][1]-coord_count[i][1])
+				       +(halo_positions[j][2]-coord_count[i][2])*(halo_positions[j][2]-coord_count[i][2]))
+				       /radiussq;
+			
 			if (ratio <= double(1.0))
 			{
 				if (double(1.0)-ratio > epsneg)
 				{
-					coord_count[i][3] = coord_count[i][3] + 1;
+					counts[i] = counts[i] + 1;
 				}
 				else
 				{
-					coord_count[i][4] = coord_count[i][4] + 1;
+					uncertainty[i] = uncertainty[i] + 1;
 					printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
-							halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
+							halo_positions[j][0], halo_positions[j][1], halo_positions[j][2],
 							coord_count[i][0], coord_count[i][1], coord_count[i][2]);
 				}
 			}
@@ -279,9 +278,9 @@ int main(int argc, char *argv[]) {
 			{
 				if (ratio-double(1.0) < eps)
 				{
-					coord_count[i][4] = coord_count[i][4] + 1;
+					uncertainty[i] = uncertainty[i] + 1;
 					printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
-							halo_positions[j][2], halo_positions[j][3], halo_positions[j][4],
+							halo_positions[j][0], halo_positions[j][1], halo_positions[j][2],
 							coord_count[i][0], coord_count[i][1], coord_count[i][2]);
 				}
 			}
@@ -309,9 +308,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	unsigned int task_uncertainty = 0;
-	for (unsigned int row = 0; row < coord_count.size(); ++row) {
-		counts[row] = coord_count[row][3];
-		uncertainty[row] = coord_count[row][4];
+	for (unsigned int row = 0; row < coordnum; ++row) {
+		//counts[row] = coord_count[row][3];
+		//uncertainty[row] = coord_count[row][4];
 		// treat all uncertain cases as inside the cells and add uncertainty to counts
 		uncertain_counts[row] = counts[row] + uncertainty[row];
 		task_uncertainty += uncertainty[row];

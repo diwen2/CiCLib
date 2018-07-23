@@ -5,7 +5,7 @@ CC=CC
 #FFLAGS=-h profile_generate
 #CFLAGS=-c -fast -qopt-report -no-ipo -qno-openmp -std=c++11
 #CFLAGS=-c -Wall -O3 -g -pg -fopenmp -std=c++11
-CFLAGS=-c -Wall -O0 -fopenmp -std=c++11
+CFLAGS=-c -Wall -O3 -fopenmp -std=c++11
 LDFLAGS=-fopenmp
 SOURCES= FOFReaderLib/FOFFiles/FOFCube.cpp \
     FOFReaderLib/FOFFiles/FOFFile.cpp \
