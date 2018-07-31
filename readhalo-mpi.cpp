@@ -235,29 +235,13 @@ int main(int argc, char *argv[]) {
 	unsigned int halonum = halo_positions.size();
 	//omp_set_nested(1);
 	//#pragma omp parallel for
-	for (unsigned long int i = 0; i < coordnum; ++i){
-	        for (unsigned int j = 0; j < halonum; ++j){
-	//for(unsigned int j = 0; j < halonum; ++j){
-		//for (unsigned long int i = 0; i <coordnum; ++i){
-			/*
-			double hpj2 = halo_positions[j][2];
-			double hpj3 = halo_positions[j][3];
-			double hpj4 = halo_positions[j][4];
-			double cci0 = coord_count[i][0];
-			double cci1 = coord_count[i][1];
-			double cci2 = coord_count[i][2];
-			double h2c0 = hpj2 - cci0;
-			double h3c1 = hpj3 - cci1;
-			double h4c2 = hpj4 - cci2;
-			double sq20 = h2c0 * h2c0;
-			double sq31 = h3c1 * h3c1;
-			double sq42 = h4c2 * h4c2;
-			double sqhc = sq20 + sq31 + sq42;
-			double ratio = sqhc / radiussq;
-			*/
-			double ratio = ((halo_positions[j][0]-coord_count[i][0])*(halo_positions[j][0]-coord_count[i][0])
-				       +(halo_positions[j][1]-coord_count[i][1])*(halo_positions[j][1]-coord_count[i][1])
-				       +(halo_positions[j][2]-coord_count[i][2])*(halo_positions[j][2]-coord_count[i][2]))
+	for (unsigned int j = 0; j < halonum; j += 4096){
+	    for (unsigned long int i = 0; i < coordnum; ++i){
+		unsigned int jj = 0;
+		while (jj < 4096 && j + jj < halonum){
+			double ratio = ((halo_positions[j+jj][0]-coord_count[i][0])*(halo_positions[j+jj][0]-coord_count[i][0])
+				       +(halo_positions[j+jj][1]-coord_count[i][1])*(halo_positions[j+jj][1]-coord_count[i][1])
+				       +(halo_positions[j+jj][2]-coord_count[i][2])*(halo_positions[j+jj][2]-coord_count[i][2]))
 				       /radiussq;
 			
 			if (ratio <= double(1.0))
@@ -270,7 +254,7 @@ int main(int argc, char *argv[]) {
 				{
 					uncertainty[i] = uncertainty[i] + 1;
 					printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
-							halo_positions[j][0], halo_positions[j][1], halo_positions[j][2],
+							halo_positions[j+jj][0], halo_positions[j+jj][1], halo_positions[j+jj][2],
 							coord_count[i][0], coord_count[i][1], coord_count[i][2]);
 				}
 			}
@@ -280,10 +264,11 @@ int main(int argc, char *argv[]) {
 				{
 					uncertainty[i] = uncertainty[i] + 1;
 					printf("Can't decide if halo (%e, %e, %e) is in cell (%e, %e, %e).\n",
-							halo_positions[j][0], halo_positions[j][1], halo_positions[j][2],
+							halo_positions[j+jj][0], halo_positions[j+jj][1], halo_positions[j+jj][2],
 							coord_count[i][0], coord_count[i][1], coord_count[i][2]);
 				}
 			}
+			++jj;
 			/*
 			if (double(1.0)-ratio > epsneg)
 			{
@@ -305,6 +290,7 @@ int main(int argc, char *argv[]) {
 			}
 			*/
 		}
+	    }
 	}
 
 	unsigned int task_uncertainty = 0;
