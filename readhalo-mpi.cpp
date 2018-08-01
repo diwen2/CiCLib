@@ -188,7 +188,7 @@ vector<vector<float> > initcoordinate(float resolution, float xmin, float xmax) 
 */
 
 int main(int argc, char *argv[]) {
-	int numtasks, taskid, chunksize;
+	int numtasks, taskid, chunksize, bufsize;
 	unsigned int max_count, max_uncertain_count, task_max, task_uncertain_max, num_uncertain;
 	double resolution = 1 / (double)ARRAYSIZE;
 	//float resolution = 1/(float)ARRAYSIZE;
@@ -197,23 +197,25 @@ int main(int argc, char *argv[]) {
 	//machine_parameter.report();
 	double eps = machine_parameter.eps;
 	double epsneg = machine_parameter.epsneg;
-	// ARRAYSIZE/numtasks has to an integer
-	// i.e. number of grid on an axis must be divisible by number of processes
-	//double xarray[ARRAYSIZE];
-	//float xarray[ARRAYSIZE];
+	MPI_File fh_counts;
+	MPI_File fh_uncertain;
+	MPI_Status status;
 
 	/***** Initializations *****/
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
 	MPI_Comm_rank(MPI_COMM_WORLD, &taskid);
-	// chunksize = ARRAYSIZE / numtasks;
+
+	starttime = MPI_Wtime();
+
 	chunksize = ARRAYSIZE*ARRAYSIZE/numtasks; // ARRAYSIZE^2 is divisible by numtasks
 	unsigned int counts[chunksize*ARRAYSIZE] = {0};
 	unsigned int uncertainty[chunksize*ARRAYSIZE] = {0};
 	unsigned int uncertain_counts[chunksize*ARRAYSIZE] = {0};
-	//tag2 = 1;
-	//tag1 = 2;
-	starttime = MPI_Wtime();
+
+	MPI_File_open(MPI_COMM_WORLD, "counts.bin", MPI_MODE_CREATE|MPI_MODE_WRONLY, MPI_INFO_NULL, &fh_counts);
+	MPI_File_open(MPI_COMM_WORLD, "uncertain_counts.bin", MPI_MODE_CREATE|MPI_MODE_WRONLY, MPI_INFO_NULL, &fh_uncertain);
+
 	printf("MPI task %d has started...\n", taskid);
 	/* Load halo catalog */
 	printf("Task %d is loading halo catalog...\n", taskid);
@@ -227,16 +229,18 @@ int main(int argc, char *argv[]) {
 	//		xarray[offset], xarray[offset + chunksize - 1]);
 	//vector<vector<float> > coord_count = initcoordinate(resolution,
 	//		xarray[offset], xarray[offset + chunksize - 1]);
-	printf("Task %d coordinates start with %e, %e, %e, %e\n", taskid,
-			coord_count[0][0], coord_count[0][1], coord_count[0][2], coord_count[0][3]);
+	printf("Task %d coordinates start with %e, %e, %e\n", taskid,
+			coord_count[0][0], coord_count[0][1], coord_count[0][2]);
 	printf("Task %d has %lu coordinates.\n", taskid, coord_count.size());
 
-	unsigned long int coordnum = coord_count.size();
+	unsigned int coordnum = coord_count.size();
 	unsigned int halonum = halo_positions.size();
+	unsigned int taskidj[2] = {(unsigned int)taskid, 0};   // taskid, j
 	//omp_set_nested(1);
 	//#pragma omp parallel for
 	for (unsigned int j = 0; j < halonum; j += 4096){
-	    for (unsigned long int i = 0; i < coordnum; ++i){
+		taskidj[1] = j;
+	    for (unsigned int i = 0; i < coordnum; ++i){
 		unsigned int jj = 0;
 		while (jj < 4096 && j + jj < halonum){
 			double ratio = ((halo_positions[j+jj][0]-coord_count[i][0])*(halo_positions[j+jj][0]-coord_count[i][0])
@@ -302,6 +306,15 @@ int main(int argc, char *argv[]) {
 		task_uncertainty += uncertainty[row];
 		//printf("%d ", counts[row]);
 	}
+
+	bufsize = (chunksize + 2) * 4;
+	MPI_File_write_at(fh_counts, taskid*bufsize, taskidj, 2, MPI_UNSIGNED, &status);
+	MPI_File_write_at(fh_counts, taskid*bufsize + 8, counts, chunksize*ARRAYSIZE, MPI_UNSIGNED, & status);
+	MPI_File_close(&fh_counts);
+	MPI_File_write_at(fh_uncertain, taskid*bufsize, taskidj, 2, MPI_UNSIGNED, &status);
+	MPI_File_write_at(fh_uncertain, taskid*bufsize + 8, uncertain_counts, chunksize*ARRAYSIZE, MPI_UNSIGNED, & status);
+	MPI_File_close(&fh_uncertain);
+
 	printf("Task %d counts are %d %d ....\n", taskid, counts[0], counts[1]);
 	printf("Task %d uncertain counts are %d %d ....\n",
 			taskid, uncertain_counts[0], uncertain_counts[1]);
