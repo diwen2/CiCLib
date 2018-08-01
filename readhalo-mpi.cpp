@@ -235,11 +235,11 @@ int main(int argc, char *argv[]) {
 
 	unsigned int coordnum = coord_count.size();
 	unsigned int halonum = halo_positions.size();
-	unsigned int taskidj[2] = {(unsigned int)taskid, 0};   // taskid, j
+	//unsigned int taskidj[2] = {(unsigned int)taskid, 0};   // taskid, j
 	//omp_set_nested(1);
 	//#pragma omp parallel for
 	for (unsigned int j = 0; j < halonum; j += 4096){
-		taskidj[1] = j;
+		//taskidj[1] = j;
 	    for (unsigned int i = 0; i < coordnum; ++i){
 		unsigned int jj = 0;
 		while (jj < 4096 && j + jj < halonum){
@@ -307,12 +307,12 @@ int main(int argc, char *argv[]) {
 		//printf("%d ", counts[row]);
 	}
 
-	bufsize = (chunksize + 2) * 4;
-	MPI_File_write_at(fh_counts, taskid*bufsize, taskidj, 2, MPI_UNSIGNED, &status);
-	MPI_File_write_at(fh_counts, taskid*bufsize + 8, counts, chunksize*ARRAYSIZE, MPI_UNSIGNED, & status);
+	bufsize = chunksize * ARRAYSIZE * sizeof(unsigned int);
+	//MPI_File_write_at(fh_counts, taskid*bufsize, taskidj, 2, MPI_UNSIGNED, &status);
+	MPI_File_write_at(fh_counts, taskid*bufsize, counts, chunksize*ARRAYSIZE, MPI_UNSIGNED, & status);
 	MPI_File_close(&fh_counts);
-	MPI_File_write_at(fh_uncertain, taskid*bufsize, taskidj, 2, MPI_UNSIGNED, &status);
-	MPI_File_write_at(fh_uncertain, taskid*bufsize + 8, uncertain_counts, chunksize*ARRAYSIZE, MPI_UNSIGNED, & status);
+	//MPI_File_write_at(fh_uncertain, taskid*bufsize, taskidj, 2, MPI_UNSIGNED, &status);
+	MPI_File_write_at(fh_uncertain, taskid*bufsize, uncertain_counts, chunksize*ARRAYSIZE, MPI_UNSIGNED, & status);
 	MPI_File_close(&fh_uncertain);
 
 	printf("Task %d counts are %d %d ....\n", taskid, counts[0], counts[1]);
@@ -359,7 +359,7 @@ int main(int argc, char *argv[]) {
 
 		printf("\nTotal number of uncertain cases is %d.\n", num_uncertain);
 		printf("Global maximum count is %d.\n", max_count);
-		printf("Global maxium uncertain count is %d.\n", max_uncertain_count);
+		printf("Global maximum uncertain count is %d.\n", max_uncertain_count);
 
 		ofstream countfile;
 		string filename = "freq_cell_"+to_string(CELL)+"_size_"+to_string(ARRAYSIZE)+"_p_"+to_string(numtasks)+".txt";
