@@ -237,16 +237,17 @@ int main(int argc, char *argv[]) {
 	unsigned int temp = halonum / (chknum * cacheblk);
         unsigned int chkblk = temp * cacheblk;
         bufsize = chunksize * ARRAYSIZE * sizeof(unsigned int);
-
+	
         if (chkpt > 0)    // read existing checkpoint data if chkpt > 0
         {
-                int numsaved = chkblk * coordnum * chkpt;
 		MPI_File_open(MPI_COMM_WORLD, "counts.bin", MPI_MODE_RDONLY, MPI_INFO_NULL, &fh_counts);
         	MPI_File_open(MPI_COMM_WORLD, "uncertainty.bin", MPI_MODE_RDONLY, MPI_INFO_NULL, &fh_uncertain);
-                MPI_File_read_at(fh_counts, taskid*bufsize, counts, numsaved, MPI_UNSIGNED, & status);
-                MPI_File_read_at(fh_uncertain, taskid*bufsize, uncertainty, numsaved, MPI_UNSIGNED, & status);
+                printf("Checkpoint %d data files found. Loading checkpoint %d data ....\n", chkpt, chkpt);
+		MPI_File_read_at(fh_counts, taskid*bufsize, counts, coordnum, MPI_UNSIGNED, & status);
+                MPI_File_read_at(fh_uncertain, taskid*bufsize, uncertainty, coordnum, MPI_UNSIGNED, & status);
         	MPI_File_close(&fh_counts);
 		MPI_File_close(&fh_uncertain);
+		printf("Successfully read checkpoint %d data. Continue computation after checkpoint %d ....\n", chkpt, chkpt);
 	}
 	//omp_set_nested(1);
 	//#pragma omp parallel for
@@ -308,40 +309,32 @@ int main(int argc, char *argv[]) {
 	    }
 		if (j % chkblk == 0)
 		{
-			int offset = taskid*bufsize + j*coordnum*sizeof(unsigned int);
-			int nints = chkblk * coordnum;
-			//	nints = (halonum - chkblk*chknum) * coordnum;
-			unsigned int *cbuf = &counts[j*coordnum];
 			MPI_File_open(MPI_COMM_WORLD, "counts.bin", MPI_MODE_CREATE|MPI_MODE_WRONLY, MPI_INFO_NULL, &fh_counts);
-			MPI_File_write_at(fh_counts, offset, cbuf, nints, MPI_UNSIGNED, & status);
+			MPI_File_write_at(fh_counts, taskid*bufsize, counts, coordnum, MPI_UNSIGNED, & status);
 			MPI_File_close(&fh_counts);
-			unsigned int *ubuf = &uncertainty[j*coordnum];
 			MPI_File_open(MPI_COMM_WORLD, "uncertainty.bin", MPI_MODE_CREATE|MPI_MODE_WRONLY, MPI_INFO_NULL, &fh_uncertain);
-			MPI_File_write_at(fh_uncertain, offset, ubuf, nints, MPI_UNSIGNED, & status);
+			MPI_File_write_at(fh_uncertain, taskid*bufsize, uncertainty, coordnum, MPI_UNSIGNED, & status);
 			MPI_File_close(&fh_uncertain);
+			MPI_Barrier(MPI_COMM_WORLD);    // Don't know whether all tasks have saved.
 			if (taskid == MASTER)
 				printf("Checkpoint %d data saved in binary files.\n", chkpt);
 			++chkpt;
 		}
 	}
-
+	
 	if (halonum % chkblk != 0)
 	{
         	// save counts from the last checkpoint to the end
-		int offsetend = taskid*bufsize + chkblk*chknum*sizeof(unsigned int);
-        	int nintsend = (halonum-chkblk*chknum)*coordnum;
-        	unsigned int *cbufend = &counts[chkblk*chknum*coordnum];
-		unsigned int *ubufend = &uncertainty[chkblk*chknum*coordnum];
         	MPI_File_open(MPI_COMM_WORLD, "counts.bin", MPI_MODE_WRONLY, MPI_INFO_NULL, &fh_counts);
-        	MPI_File_write_at(fh_counts, offsetend, cbufend, nintsend, MPI_UNSIGNED, & status);
+        	MPI_File_write_at(fh_counts, taskid*bufsize, counts, coordnum, MPI_UNSIGNED, & status);
         	MPI_File_close(&fh_counts);
         	MPI_File_open(MPI_COMM_WORLD, "uncertainty.bin", MPI_MODE_WRONLY, MPI_INFO_NULL, &fh_uncertain);
-        	MPI_File_write_at(fh_uncertain, offsetend, ubufend, nintsend, MPI_UNSIGNED, & status);
+        	MPI_File_write_at(fh_uncertain, taskid*bufsize, uncertainty, coordnum, MPI_UNSIGNED, & status);
         	MPI_File_close(&fh_uncertain);
 	}
 	if (taskid == MASTER)
-                printf("All counts and uncertainties saved!");
-
+                printf("Last checkpoint reached. All counts and uncertainties saved.\n");
+	
 	unsigned int task_uncertainty = 0;
 	for (unsigned int row = 0; row < coordnum; ++row) {
 		//counts[row] = coord_count[row][3];
