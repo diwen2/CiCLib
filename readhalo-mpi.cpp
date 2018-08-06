@@ -24,7 +24,7 @@ const double h = 0.720000000000000;
 const double Mpc = 3.085677581e+24;  // cm per Mpc
 const double radiussq = CELL*CELL/(unit_l/Mpc*h)/(unit_l/Mpc*h);
 const unsigned int chknum  = 10;    // number of checkpoint saves before job completion
-const unsigned int cacheblk = 4096;    // optimal cache blocking size
+const unsigned int cacheblk = 256;    // optimal cache blocking size
 unsigned int chkpt = 0;    // Restarted job should start from the last saved checkpoint.
 
 using namespace std;
