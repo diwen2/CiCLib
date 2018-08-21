@@ -1,6 +1,6 @@
 #CC=g++
-#CC=mpic++
-CC=CC
+CC=mpic++
+#CC=CC
 #CFLAGS=-c -O3 -h profile_generate,std=c++11,gnu
 #FFLAGS=-h profile_generate
 #CFLAGS=-c -fast -qopt-report -no-ipo -qno-openmp -std=c++11
@@ -26,7 +26,7 @@ SOURCES= FOFReaderLib/FOFFiles/FOFCube.cpp \
 OBJECTS=$(SOURCES:.cpp=.o)
 
 all: $(SOURCES) FOFReader getAreaFiles getBiggestHalo exportMasst generateImage \
-				generateRandomCube readhalo-mpi savebin uniformhalo \
+				generateRandomCube readhalo-mpi savebin uniformhalo jackknife\
 #				ranhalo
 FOFReader: FOFReader.o $(OBJECTS) 
 	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@
@@ -57,6 +57,9 @@ uniformhalo: uniformhalo.o $(OBJECTS)
 
 #ranhalo: ranhalo.o $(OBJECTS) 
 #	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@	-lgsl -lgslcblas -lm
+
+jackknife: jackknife.o $(OBJECTS) 
+	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@
 	
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@
@@ -64,4 +67,4 @@ uniformhalo: uniformhalo.o $(OBJECTS)
 clean:
 	rm -rf *o FOFReaderLib/*.o FOFReaderLib/FOFFiles/*.o FOFReaderLib/DEUSSimulation/*.o \
 	FOFReader getBiggestHalo exportMasst generateImage generateRandomCube getAreaFiles \
-	readhalo-mpi savebin uniformhalo ranhalo
+	readhalo-mpi savebin uniformhalo ranhalo jackknife
