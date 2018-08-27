@@ -3,8 +3,9 @@
 #include <vector>
 #include <sstream>
 #include <algorithm>
+#include <iterator>
 
-const unsigned int numsub = 2;
+const unsigned int numsub = 64;
 
 int main(int argc, char *argv[]) {
 	for (unsigned int i = 0; i < numsub; ++i){
@@ -16,11 +17,17 @@ int main(int argc, char *argv[]) {
 		else
 			std::cout << "Warning: number of counts doesn't match 512^3." << std::endl;
 		in.seekg(0, std::ios::beg);
-
-		std::vector<unsigned int> counts(num);
-		in.read((char *)&counts[0], num*sizeof(unsigned int));
-		counts.erase(counts.begin()+i*num/numsub, counts.begin()+(i+1)*num/numsub);
-		std::cout << counts[0] << " " << counts[1] << "...." << std::endl;
+		std::vector<unsigned int> counts(num/2);
+		std::vector<unsigned int> counts2(num/2);
+		if(in.good()){
+        	        in.read((char *)&counts[0], num/2*sizeof(unsigned int));
+			in.read((char *)&counts2[0], num/2*sizeof(unsigned int));
+		}
+		std::copy(counts2.begin(), counts2.end(), std::back_inserter(counts));
+		std::cout << "Erasing " << counts[num/numsub*i] << " " << counts[num/numsub*i+1] << " " << counts[num/numsub*i+2]
+			 	<< " .... " << counts[num/numsub*(i+1)-3] << " " << counts[num/numsub*(i+1)-2] 
+				<< " " << counts[num/numsub*(i+1)-1] << std::endl;
+		counts.erase(counts.begin()+num/numsub*i, counts.begin()+num/numsub*(i+1));
 		std::cout << "Jackknife subsample " << i << " has " << counts.size() <<" counts." << std::endl;
 
 		unsigned int max_count = *std::max_element(counts.begin(), counts.end());
