@@ -64,17 +64,15 @@ int main(int argc, char *argv[]){
 			+std::to_string(ARRAYSIZE)+"_cut.txt";
 	countfile.open(filename);
 
-	unsigned int sum = 0;
-	unsigned int max_count = *std::max_element(counts.begin(), counts.end());
+	unsigned int max_count = *std::max_element(counts_cut.begin(), counts_cut.end());
 	printf("Global maximum count is %d.\n", max_count);
+	unsigned int Nfreq[max_count+1];
 	for (unsigned int i = 0; i < max_count +1; ++i){
-		sum += counts_cut[i];
-		countfile << counts_cut[i] << " ";
+		Nfreq[i] = std::count(counts_cut.begin(), counts_cut.end(), i);
+		countfile << Nfreq[i] << " ";
 	}
 
 	countfile.close();
-
-	printf("Total counts is %u.\n", sum);
 	std::cout << "Counts saved in file " << filename << "." << std::endl;
 
 	return 0;
