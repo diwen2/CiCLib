@@ -61,8 +61,7 @@ int main(int argc, char *argv[]){
 	std::cout << (double)counts_cut.size()/(double)counts.size()*100 << "% counts left." << std::endl;
 
 	std::ofstream countfile;
-	std::string filename = "freq_cell_"+std::to_string(CELL)+"_size_"
-			+std::to_string(ARRAYSIZE)+"_cut.txt";
+	std::string filename = "freq_cell_"+std::to_string(CELL)+"_cut.txt";
 	countfile.open(filename);
 
 	unsigned int max_count = *std::max_element(counts_cut.begin(), counts_cut.end());
