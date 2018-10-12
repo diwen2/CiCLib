@@ -26,7 +26,7 @@ SOURCES= FOFReaderLib/FOFFiles/FOFCube.cpp \
 OBJECTS=$(SOURCES:.cpp=.o)
 
 all: $(SOURCES) FOFReader getAreaFiles getBiggestHalo exportMasst generateImage \
-				generateRandomCube readhalo-mpi savebin uniformhalo jackknife\
+				generateRandomCube readhalo-mpi savebin uniformhalo jackknife edge\
 #				ranhalo
 FOFReader: FOFReader.o $(OBJECTS) 
 	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@
@@ -60,11 +60,14 @@ uniformhalo: uniformhalo.o $(OBJECTS)
 
 jackknife: jackknife.o $(OBJECTS) 
 	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@
-	
+
+edge: edge.o $(OBJECT)
+	$(CC) $(LDFLAGS) $@.o $(OBJECTS) -o $@
+		
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@
 	
 clean:
 	rm -rf *o FOFReaderLib/*.o FOFReaderLib/FOFFiles/*.o FOFReaderLib/DEUSSimulation/*.o \
 	FOFReader getBiggestHalo exportMasst generateImage generateRandomCube getAreaFiles \
-	readhalo-mpi savebin uniformhalo ranhalo jackknife
+	readhalo-mpi savebin uniformhalo ranhalo jackknife edge
