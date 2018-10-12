@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <omp.h>
 
 const unsigned int ARRAYSIZE = 512; //number of grids on one side of a cubic box
 const double CELL = 25;  //10.052941;  //in Mpc/h
@@ -67,9 +68,11 @@ int main(int argc, char *argv[]){
 	unsigned int max_count = *std::max_element(counts_cut.begin(), counts_cut.end());
 	printf("Global maximum count is %d.\n", max_count);
 	unsigned int Nfreq[max_count+1];
+	#pragma omp parallel for
 	for (unsigned int i = 0; i < max_count +1; ++i){
 		Nfreq[i] = std::count(counts_cut.begin(), counts_cut.end(), i);
 		countfile << Nfreq[i] << " ";
+		printf("i, p, Nfreq = %d, %d, %d\n", i, omp_get_thread_num(), Nfreq[i]);
 	}
 
 	countfile.close();
