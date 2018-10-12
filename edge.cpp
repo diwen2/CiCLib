@@ -71,8 +71,11 @@ int main(int argc, char *argv[]){
 	#pragma omp parallel for
 	for (unsigned int i = 0; i < max_count +1; ++i){
 		Nfreq[i] = std::count(counts_cut.begin(), counts_cut.end(), i);
+		//printf("i, p, Nfreq = %d, %d, %d\n", i, omp_get_thread_num(), Nfreq[i]);
+	}
+
+	for (unsigned int i = 0; i < max_count+1; ++i){
 		countfile << Nfreq[i] << " ";
-		printf("i, p, Nfreq = %d, %d, %d\n", i, omp_get_thread_num(), Nfreq[i]);
 	}
 
 	countfile.close();
